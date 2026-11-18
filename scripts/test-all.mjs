@@ -26,6 +26,7 @@ const SUITES = [
   { name: 'packaging smoke', cwd: ROOT, command: process.execPath, args: ['scripts/pack-smoke.mjs'] },
   { name: 'OpenCode native plugin smoke', cwd: ROOT, command: process.execPath, args: ['scripts/opencode-plugin-smoke.mjs'] },
   { name: 'OpenCode panel smoke', cwd: ROOT, command: process.execPath, args: ['scripts/opencode-panel-smoke.mjs'] },
+  { name: 'OpenCode desktop GUI smoke', cwd: ROOT, command: process.execPath, args: ['scripts/opencode-gui-smoke.mjs'] },
   // Skips (exit 0) when @modelcontextprotocol/sdk is not installed; see docs/MCP-COMPLIANCE.md.
   { name: 'official MCP SDK compliance', cwd: ROOT, command: process.execPath, args: ['scripts/mcp-compliance.mjs'] },
 ];

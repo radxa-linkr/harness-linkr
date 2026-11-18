@@ -130,3 +130,23 @@ reply  stream closed cleanly, device mode restored by dispose()
 The fetched frame was the controlled host's desktop (1920×1080 KDE session), i.e. the panel is not
 a mock: it serves the same session the tools drive. Input forwarding is covered by
 `scripts/opencode-panel-smoke.mjs` (click/key/paste go through `linkr_computer_use`).
+
+
+## Desktop sidebar panel (GUI part)
+
+The package now exports `./gui-experimental`: a prebuilt OpenCode GUI part (5,163 bytes, CommonJS)
+whose only `require`s are the modules the desktop app provides:
+`@opencode/plugin/gui`, `@opencode/plugin/rpc`, `solid-js`, `solid-js/web`. It registers one
+`side`-region panel (560 px, tab "Linkr 共享电脑"), a toggle command (`ctrl+alt+l`) and a
+`session.panel` menu row; the panel body is an iframe of the loopback page (`&embed=1`) fed by the
+`opencode-linkr.panel` RPC.
+
+`scripts/opencode-gui-smoke.mjs` stubs the host modules, requires the bundle and runs its `setup`:
+it checks the bundle shape, both locales, and that setup registers exactly one style, one panel
+(`region: side`, tab id `screen`), the toggle command and the session-panel menu item. `npm test`
+runs it.
+
+Visual confirmation inside the desktop app could not be automated from here (the process has no
+Screen Recording permission, and the app's webview does not expose its accessibility tree); that
+last check is a manual one: open a project in OpenCode desktop, press **Ctrl+Alt+L** (or use the
+command palette / session panel menu) and the Linkr tab should appear in the session sidebar.

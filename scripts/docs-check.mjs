@@ -272,6 +272,15 @@ check('opencode native plugin package is complete', () => {
   for (const tool of ['linkr_status', 'linkr_computer_use', 'linkr_panel']) if (!index.includes(tool)) throw new Error(`index.js does not register ${tool}`);
   for (const file of ['panel-server.js', 'panel/index.html', 'panel/panel.js', 'panel/panel.css']) if (!exists(`opencode/plugin/${file}`)) throw new Error(`opencode/plugin/${file} is missing`);
   if (!Array.isArray(pkg.files) || !pkg.files.includes('panel-server.js')) throw new Error('files must ship panel-server.js');
+  if (pkg.exports?.['./gui-experimental'] !== './dist/gui-experimental.cjs') throw new Error('package.json must export ./gui-experimental');
+  if (!Array.isArray(pkg.files) || !pkg.files.includes('dist')) throw new Error('files must ship dist/');
+  for (const file of ['vite.config.mjs', 'gui/index.jsx', 'gui/panel.jsx', 'gui/rpc-schema.js', 'dist/gui-experimental.cjs']) {
+    if (!exists(`opencode/plugin/${file}`)) throw new Error(`opencode/plugin/${file} is missing`);
+  }
+  const bundle = read('opencode/plugin/dist/gui-experimental.cjs');
+  for (const external of ['@opencode/plugin/gui', '@opencode/plugin/rpc', 'solid-js']) {
+    if (!bundle.includes(`require("${external}")`)) throw new Error(`the GUI bundle should keep ${external} external`);
+  }
   if (!exists('opencode/plugin/README.md')) throw new Error('opencode/plugin/README.md is missing');
   if (!exists('opencode/plugin/LICENSE')) throw new Error('opencode/plugin/LICENSE is missing');
 });

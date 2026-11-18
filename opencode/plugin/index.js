@@ -24,6 +24,7 @@ import { Plugin } from '@opencode/plugin';
 import { readConfig } from '../../mcp-linkr/config.js';
 import { createLinkrTools, TOOLS } from '../../mcp-linkr/tools.js';
 import { createPanelServer } from './panel-server.js';
+import LinkrPanelRpc from './gui/rpc.js';
 
 export const id = 'opencode-linkr';
 
@@ -147,30 +148,54 @@ export default Plugin.define({
     const tools = createLinkrTools(config);
     const panelFps = Math.max(2, Math.min(15, Number(config.client.fps) || 10));
     let panel = null;
+    const openPanel = async () => {
+      if (panel === null) panel = await createPanelServer({ tools, fps: panelFps });
+      return panel;
+    };
+    const closePanel = async () => {
+      if (panel === null) return;
+      const running = panel;
+      panel = null;
+      await running.close();
+    };
+    const panelUrl = () => (panel === null ? '' : panel.url);
+
+    // The desktop-app GUI panel is a browser window: it asks this RPC for the
+    // loopback URL instead of starting a server itself.
+    await ctx.rpc.register(LinkrPanelRpc, {
+      open: async () => {
+        const server = await openPanel();
+        return { url: server.url, running: true };
+      },
+      state: async () => ({ url: panelUrl(), running: panel !== null }),
+      close: async () => {
+        await closePanel();
+        return { ok: true };
+      },
+    });
+
     const panelTool = {
       ...PANEL_TOOL,
       execute: async (args = {}) => {
         const action = typeof args.action === 'string' ? args.action.trim().toLowerCase() : '';
         if (action === 'open') {
-          if (panel === null) panel = await createPanelServer({ tools, fps: panelFps });
+          const server = await openPanel();
           return {
             content: [
-              { type: 'text', text: `Linkr 面板已启动：${panel.url}\n在浏览器打开即可观看和操作；面板与 agent 共用同一个设备会话。` },
+              { type: 'text', text: `Linkr 面板已启动：${server.url}\n在浏览器打开即可观看和操作；面板与 agent 共用同一个设备会话。` },
             ],
-            metadata: { url: panel.url },
+            metadata: { url: server.url },
           };
         }
         if (action === 'state') {
+          const running = panel !== null;
           return {
-            content: [{ type: 'text', text: panel === null ? 'Linkr 面板未启动；用 action "open" 启动。' : `Linkr 面板：${panel.url}` }],
-            metadata: panel === null ? {} : { url: panel.url },
+            content: [{ type: 'text', text: running ? `Linkr 面板：${panelUrl()}` : 'Linkr 面板未启动；用 action "open" 启动。' }],
+            metadata: running ? { url: panelUrl() } : {},
           };
         }
         if (action === 'close') {
-          if (panel !== null) {
-            await panel.close();
-            panel = null;
-          }
+          await closePanel();
           return { content: [{ type: 'text', text: 'Linkr 面板已关闭。' }] };
         }
         throw new Error('action must be "open", "state" or "close"');
@@ -181,10 +206,7 @@ export default Plugin.define({
       editor.add(panelTool);
     });
     return async () => {
-      if (panel !== null) {
-        await panel.close();
-        panel = null;
-      }
+      await closePanel();
       await tools.dispose();
     };
   },

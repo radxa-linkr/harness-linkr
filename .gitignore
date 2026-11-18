@@ -24,3 +24,7 @@ dsh-linkr/lib/
 
 # Local design-tooling scratch
 .impeccable/
+
+# The OpenCode GUI part is a prebuilt bundle (linkr-bee does the same)
+!opencode/plugin/dist/
+!opencode/plugin/dist/**

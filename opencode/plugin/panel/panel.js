@@ -2,7 +2,10 @@
 (() => {
   'use strict';
 
-  const token = new URLSearchParams(location.search).get('t') || '';
+  const params = new URLSearchParams(location.search);
+  const token = params.get('t') || '';
+  const embed = params.has('embed');
+  if (embed) document.body.classList.add('embed');
   const withToken = (path) => `${path}${path.includes('?') ? '&' : '?'}t=${encodeURIComponent(token)}`;
 
   const $ = (id) => document.getElementById(id);

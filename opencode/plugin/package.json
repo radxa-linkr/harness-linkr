@@ -6,12 +6,15 @@
   "main": "./index.js",
   "exports": {
     ".": "./index.js",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./gui-experimental": "./dist/gui-experimental.cjs"
   },
   "files": [
     "index.js",
     "panel-server.js",
     "panel",
+    "gui",
+    "dist",
     "README.md",
     "LICENSE"
   ],
@@ -29,5 +32,13 @@
   "license": "GPL-3.0-only",
   "dependencies": {
     "@opencode/plugin": "2.2.7"
+  },
+  "scripts": {
+    "build:gui": "vite build --config vite.config.mjs"
+  },
+  "devDependencies": {
+    "solid-js": "^1.9.17",
+    "vite": "^7.3.7",
+    "vite-plugin-solid": "^2.11.10"
   }
 }

@@ -96,6 +96,32 @@ Expected: the model calls `tools.linkr_status()` / `tools.linkr_computer_use({ac
 and answers with the device name and frame size; the capture JPEG is under `.linkr/captures/`
 and the model can describe the screen from it.
 
+## Desktop app panel (OpenCode GUI part)
+
+`./gui-experimental` is a prebuilt OpenCode GUI plugin part: the desktop app evaluates it in every
+window, so the panel lives **in the session sidebar** next to the conversation, like the DSH
+right-column panel.
+
+- Open it with the command palette command **Linkr: 打开/关闭共享电脑画面** (default binding
+  **Ctrl+Alt+L**), or from the session's panel menu (**Linkr 共享电脑**).
+- The tab opens in the session's side region (560 px) and renders the loopback page in an iframe
+  (`&embed=1`, so the page drops its outer chrome); **刷新** reloads it and **在浏览器打开** opens the
+  standalone page.
+- The window side has no Node access, so it asks the server part for the panel URL over the
+  `opencode-linkr.panel` RPC; the server starts the same panel server `linkr_panel` uses.
+
+The bundle is `dist/gui-experimental.cjs` (≈5 KiB, committed). Rebuild it after editing `gui/`:
+
+```sh
+cd opencode/plugin
+npm run build:gui        # vite build --config vite.config.mjs
+```
+
+The GUI bundle keeps the app-provided modules external (`@opencode/plugin/gui`,
+`@opencode/plugin/rpc`, `solid-js`, `solid-js/web`), which is what the OpenCode GUI Vite preset
+enforces. It is part of the desktop app; the browser web UI served by `opencode serve` does not load
+GUI plugin parts.
+
 ## Live panel
 
 The agent can open the panel:
