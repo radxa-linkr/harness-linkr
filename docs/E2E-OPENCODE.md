@@ -170,3 +170,20 @@ $ curl -u opencode:<service password> http://127.0.0.1:49374/api/plugin
 
 The sidebar tab ("Linkr 共享电脑", Ctrl+Alt+L) then appears in the session panel menu next to other
 plugins' panels.
+
+
+## Desktop panel: theme, settings and resilience (2026-11-18)
+
+The panel now follows the desktop app's appearance: `gui/panel.jsx` reads
+`ctx.appearance.mode()` and appends `&theme=light|dark` to the iframe URL; the page sets
+`<html data-theme=…>` and the stylesheet carries both palettes (a standalone page falls back to
+`prefers-color-scheme`).
+
+The header's **设置** calls the `opencode-linkr.panel` RPC (`settings` / `saveSettings`): the server
+persists address/account/password/codec to `~/.linkr/opencode-plugin.json` (0600), rebuilds the
+device tools and returns a fresh panel URL, which the window loads in place. The password is only
+written when a new one is typed; leaving it blank keeps the current credential.
+
+A page whose panel server disappeared (plugin reload) posts `{type:"linkr-panel-error"}` to the
+window, which re-requests `open` from the RPC and reloads the iframe with the new URL — the previous
+symptom was a styled page with "Failed to fetch" because the iframe kept the dead port.

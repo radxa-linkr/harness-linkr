@@ -6,6 +6,10 @@
   const token = params.get('t') || '';
   const embed = params.has('embed');
   if (embed) document.body.classList.add('embed');
+  // The desktop panel passes the app's appearance; a standalone page falls
+  // back to the system preference (see the CSS media query).
+  const theme = params.get('theme');
+  if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
   const withToken = (path) => `${path}${path.includes('?') ? '&' : '?'}t=${encodeURIComponent(token)}`;
 
   const $ = (id) => document.getElementById(id);
@@ -35,6 +39,19 @@
   const NAMED = new Set(['Enter', 'Escape', 'Tab', 'Backspace', 'Delete', 'Insert', 'Home', 'End', 'PageUp', 'PageDown', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
   const PUNCT = { Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Backslash: '\\', Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/' };
 
+  let lastParentNotice = 0;
+  /** Tell the desktop panel that this page can no longer reach its server. */
+  function reportPanelError(message) {
+    const now = Date.now();
+    if (now - lastParentNotice < 3000) return;
+    lastParentNotice = now;
+    try {
+      window.parent.postMessage({ type: 'linkr-panel-error', message: String(message) }, '*');
+    } catch {
+      /* a standalone page has no parent to tell */
+    }
+  }
+
   function showToast(text, ok = false) {
     toast.textContent = String(text);
     toast.className = ok ? 'toast ok' : 'toast';
@@ -49,11 +66,17 @@
   }
 
   async function api(path, body) {
-    const response = await fetch(withToken(path), body === undefined ? { cache: 'no-store' } : {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    let response;
+    try {
+      response = await fetch(withToken(path), body === undefined ? { cache: 'no-store' } : {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch (error) {
+      reportPanelError(error.message || error);
+      throw error;
+    }
     const payload = await response.json().catch(() => ({}));
     if (!response.ok || payload.ok === false) throw new Error(payload.error || `HTTP ${response.status}`);
     return payload;
@@ -90,6 +113,7 @@
   });
   frame.addEventListener('error', () => {
     if (frame.hidden) return;
+    reportPanelError('stream failed');
     setStatus('err', '未连接或设备不可达');
     hint.hidden = false;
     hint.textContent = '连接失败：检查设备是否在线、账号密码是否正确。3 秒后重试…';

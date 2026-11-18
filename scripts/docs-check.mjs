@@ -270,7 +270,7 @@ check('opencode native plugin package is complete', () => {
   const index = read('opencode/plugin/index.js');
   if (!index.includes('Plugin.define')) throw new Error('index.js does not define a Plugin');
   for (const tool of ['linkr_status', 'linkr_computer_use', 'linkr_panel']) if (!index.includes(tool)) throw new Error(`index.js does not register ${tool}`);
-  for (const file of ['panel-server.js', 'panel/index.html', 'panel/panel.js', 'panel/panel.css']) if (!exists(`opencode/plugin/${file}`)) throw new Error(`opencode/plugin/${file} is missing`);
+  for (const file of ['panel-server.js', 'settings.js', 'panel/index.html', 'panel/panel.js', 'panel/panel.css']) if (!exists(`opencode/plugin/${file}`)) throw new Error(`opencode/plugin/${file} is missing`);
   if (!Array.isArray(pkg.files) || !pkg.files.includes('panel-server.js')) throw new Error('files must ship panel-server.js');
   if (pkg.exports?.['./gui-experimental'] !== './dist/gui-experimental.cjs') throw new Error('package.json must export ./gui-experimental');
   if (!Array.isArray(pkg.files) || !pkg.files.includes('dist')) throw new Error('files must ship dist/');

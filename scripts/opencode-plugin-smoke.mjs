@@ -37,6 +37,8 @@ function check(name, fn) {
 }
 
 const plugin = await import(pathToFileURL(join(PLUGIN, 'index.js')).href);
+const settingsModule = await import(pathToFileURL(join(PLUGIN, 'settings.js')).href);
+const rpcSchema = await import(pathToFileURL(join(PLUGIN, 'gui', 'rpc-schema.js')).href);
 
 check('the package exports a Plugin with the expected id', () => {
   if (plugin.id !== 'opencode-linkr') throw new Error(`id is ${plugin.id}`);
@@ -48,6 +50,37 @@ check('all Linkr tools are registered (including the panel)', () => {
   const ids = [...(plugin.TOOL_IDS ?? [])].sort();
   const expected = ['linkr_computer_use', 'linkr_panel', 'linkr_status'];
   if (JSON.stringify(ids) !== JSON.stringify(expected)) throw new Error(`TOOL_IDS is ${JSON.stringify(ids)}`);
+});
+
+check('the panel RPC exposes the connection settings', () => {
+  const definition = rpcSchema.panelRpcDefinition();
+  for (const method of ['open', 'state', 'close', 'settings', 'saveSettings']) {
+    if (!definition.methods?.[method]) throw new Error(`RPC method ${method} is missing`);
+  }
+  const save = definition.methods.saveSettings.input;
+  if (!save.properties?.baseUrl) throw new Error('saveSettings does not accept a baseUrl');
+});
+
+check('settings validate, persist and merge', async () => {
+  const { mkdtemp, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const scratch = await mkdtemp(join(tmpdir(), 'linkr-settings-'));
+  const file = join(scratch, 'settings.json');
+  try {
+    const saved = await settingsModule.writeSettings({ baseUrl: 'http://linkr.test', username: 'admin', password: 'secret', codec: 'h264' }, file);
+    if (saved.version !== settingsModule.SETTINGS_VERSION) throw new Error('version is missing');
+    const read = await settingsModule.readSettings(file);
+    if (read.baseUrl !== 'http://linkr.test' || read.codec !== 'h264') throw new Error(`read back ${JSON.stringify(read)}`);
+    const clean = settingsModule.validatePatch({ baseUrl: 'http://linkr.test:8080/' });
+    if (clean.baseUrl !== 'http://linkr.test:8080') throw new Error(`baseUrl normalised to ${clean.baseUrl}`);
+    let threw = false;
+    try { settingsModule.validatePatch({ baseUrl: 'http://linkr.test/path' }); } catch { threw = true; }
+    if (!threw) throw new Error('a baseUrl with a path must be rejected');
+    const view = settingsModule.publicSettings({ client: { baseUrl: 'http://a', username: 'u', codec: 'auto', password: 'x' } }, {});
+    if (!view.hasPassword || view.passwordSource !== 'environment') throw new Error(`publicSettings ${JSON.stringify(view)}`);
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
 });
 
 check('plugin options override the LINKR_* environment', () => {

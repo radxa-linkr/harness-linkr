@@ -111,6 +111,12 @@ right-column panel.
 
 - Open it with the command palette command **Linkr: 打开/关闭共享电脑画面** (default binding
   **Ctrl+Alt+L**), or from the session's panel menu (**Linkr 共享电脑**).
+- The panel follows the app's appearance (light/dark): the GUI part passes `ctx.appearance.mode()`
+  to the page, which keeps its own light/dark palette.
+- **设置** (in the panel header) edits the connection in place: device address, account, password
+  (blank keeps the saved one) and codec. Saving writes `~/.linkr/opencode-plugin.json` (0600, over
+  the `opencode.json` options and `LINKR_*` environment), rebuilds the device tools and reloads the
+  panel. It never touches `opencode.json`.
 - The tab opens in the session's side region (560 px) and renders the loopback page in an iframe
   (`&embed=1`, so the page drops its outer chrome); **刷新** reloads it and **在浏览器打开** opens the
   standalone page.
@@ -151,9 +157,11 @@ recent activity.
   list. `linkr_panel { action: "close" }` stops the page (and plugin unload closes it too).
 - The panel starts the stream when it opens; closing the page leaves the session to the tools
   (and the device's idle-stop).
-- This is a **browser page**, not an in-app OpenCode TUI/desktop part: those need the separate
-  `@opencode/plugin/tui` / `gui` APIs and a Solid/OpenTUI build. The page works in any browser and
-  can be embedded later if an in-app panel is wanted.
+- If the plugin server was reloaded while the page was open, the page reports the stale URL to the
+  desktop panel (`postMessage`), which asks the RPC for a fresh URL and reloads the iframe; the
+  header **刷新** does the same manually.
+- The page is also served standalone (the URL from `linkr_panel`); there it follows the system
+  light/dark preference.
 
 ## Notes
 

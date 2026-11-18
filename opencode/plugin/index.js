@@ -25,6 +25,7 @@ import { readConfig } from '../../mcp-linkr/config.js';
 import { createLinkrTools, TOOLS } from '../../mcp-linkr/tools.js';
 import { createPanelServer } from './panel-server.js';
 import LinkrPanelRpc from './gui/rpc.js';
+import { publicSettings, readSettings, validatePatch, writeSettings } from './settings.js';
 
 export const id = 'opencode-linkr';
 
@@ -138,18 +139,36 @@ export function nativeTools(tools, { projectDir = '' } = {}) {
 export default Plugin.define({
   id,
   async setup(ctx) {
-    const config = configFromOptions(ctx?.options ?? {});
     const projectDir = projectDirectory(ctx?.location);
-    // Keep captures inside the session's directory unless the user chose a
-    // path (or the environment did): the agent can then read the JPEG.
-    if (projectDir !== '' && !ctx?.options?.saveDir && !process.env.LINKR_SAVE_DIR) {
-      config.saveDir = join(projectDir, '.linkr', 'captures');
-    }
-    const tools = createLinkrTools(config);
-    const panelFps = Math.max(2, Math.min(15, Number(config.client.fps) || 10));
+    // Saved settings (written by the panel's form) outrank the opencode.json
+    // options and the LINKR_* environment, so a person can fix a connection
+    // without editing JSON. Loading never touches the device.
+    let saved = await readSettings();
+    const buildConfig = () => {
+      const mergedOptions = { ...(ctx?.options ?? {}), ...saved };
+      const next = configFromOptions(mergedOptions);
+      // Keep captures inside the session's directory unless the user chose a
+      // path (or the environment did): the agent can then read the JPEG.
+      if (projectDir !== '' && !mergedOptions.saveDir && !process.env.LINKR_SAVE_DIR) {
+        next.saveDir = join(projectDir, '.linkr', 'captures');
+      }
+      return next;
+    };
+    let config = buildConfig();
+    // The tools are rebuilt when the settings change; the registered tools, the
+    // panel server and the GUI all talk to this stable facade.
+    const runtime = { current: createLinkrTools(config) };
+    const linkr = {
+      callTool: (...args) => runtime.current.callTool(...args),
+      onFrame: (listener) => runtime.current.onFrame(listener),
+      panelState: () => runtime.current.panelState(),
+      stop: () => runtime.current.stop(),
+      latest: () => runtime.current.latest(),
+    };
+    let panelFps = Math.max(2, Math.min(15, Number(config.client.fps) || 10));
     let panel = null;
     const openPanel = async () => {
-      if (panel === null) panel = await createPanelServer({ tools, fps: panelFps });
+      if (panel === null) panel = await createPanelServer({ tools: linkr, fps: panelFps });
       return panel;
     };
     const closePanel = async () => {
@@ -159,6 +178,22 @@ export default Plugin.define({
       await running.close();
     };
     const panelUrl = () => (panel === null ? '' : panel.url);
+
+    /** Persist a settings patch, rebuild the device tools and restart the panel. */
+    const applySettings = async (patch) => {
+      const clean = validatePatch(patch ?? {});
+      const next = { ...saved, ...clean };
+      await writeSettings(next);
+      saved = next;
+      config = buildConfig();
+      panelFps = Math.max(2, Math.min(15, Number(config.client.fps) || 10));
+      await closePanel();
+      const previous = runtime.current;
+      runtime.current = createLinkrTools(config);
+      await previous.dispose();
+      const server = await openPanel();
+      return { url: server.url, running: true, settings: publicSettings(config, saved) };
+    };
 
     // The desktop-app GUI panel is a browser window: it asks this RPC for the
     // loopback URL instead of starting a server itself.
@@ -172,6 +207,8 @@ export default Plugin.define({
         await closePanel();
         return { ok: true };
       },
+      settings: async () => publicSettings(config, saved),
+      saveSettings: async (input) => applySettings(input ?? {}),
     });
 
     const panelTool = {
@@ -202,12 +239,12 @@ export default Plugin.define({
       },
     };
     await ctx.tool.transform((editor) => {
-      for (const tool of nativeTools(tools, { projectDir })) editor.add(tool);
+      for (const tool of nativeTools(linkr, { projectDir })) editor.add(tool);
       editor.add(panelTool);
     });
     return async () => {
       await closePanel();
-      await tools.dispose();
+      await runtime.current.dispose();
     };
   },
 });

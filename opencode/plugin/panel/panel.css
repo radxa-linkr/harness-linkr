@@ -56,3 +56,22 @@ body.embed .activity { display: none; }
 body.embed .hint { padding: 12px; }
 body.embed .stage { flex: 1 1 auto; min-height: 0; }
 body.embed #frame { max-height: none; }
+
+/* Light appearance: the desktop panel passes the app's theme via ?theme=light;
+   a standalone page falls back to the system preference. */
+:root[data-theme="light"] { --bg: #f4f6f9; --card: #ffffff; --line: #dde1e7; --text: #1c2430; --muted: #5c6675; --accent: #2f6fed; --on: #1f9d55; --warn: #b26a00; --err: #c0392b; color-scheme: light; }
+:root[data-theme="light"] .btn { background: #ffffff; color: var(--text); }
+:root[data-theme="light"] .btn:hover { background: #eef1f6; }
+:root[data-theme="light"] .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+:root[data-theme="light"] .btn-on { border-color: var(--accent); color: var(--accent); }
+:root[data-theme="light"] .paste-box textarea { background: #ffffff; color: var(--text); }
+:root[data-theme="light"] .toast { background: #fdecea; border-color: #f3c7c2; color: #7a241c; }
+:root[data-theme="light"] .toast.ok { background: #e8f7ee; border-color: #b9e3c8; color: #14532d; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) { --bg: #f4f6f9; --card: #ffffff; --line: #dde1e7; --text: #1c2430; --muted: #5c6675; --accent: #2f6fed; color-scheme: light; }
+  :root:not([data-theme]) .btn { background: #ffffff; color: var(--text); }
+  :root:not([data-theme]) .btn:hover { background: #eef1f6; }
+  :root:not([data-theme]) .paste-box textarea { background: #ffffff; color: var(--text); }
+  :root:not([data-theme]) .toast { background: #fdecea; border-color: #f3c7c2; color: #7a241c; }
+  :root:not([data-theme]) .toast.ok { background: #e8f7ee; border-color: #b9e3c8; color: #14532d; }
+}

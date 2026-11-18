@@ -1,10 +1,44 @@
-.linkr-gui { display: flex; flex-direction: column; height: 100%; min-height: 0; background: #0f1217; color: #e7ebf2; }
-.linkr-gui header { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid #262c36; flex: none; }
+.linkr-gui {
+  --lb-bg: #0f1217;
+  --lb-fg: #e7ebf2;
+  --lb-muted: #9aa4b2;
+  --lb-line: #262c36;
+  --lb-button: #1b212a;
+  --lb-button-hover: #232b36;
+  --lb-input: #0d1015;
+  --lb-primary: #4c8dff;
+  --lb-error: #ffb4ae;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--lb-bg);
+  color: var(--lb-fg);
+}
+.linkr-gui.light {
+  --lb-bg: #ffffff;
+  --lb-fg: #1c2430;
+  --lb-muted: #5c6675;
+  --lb-line: #dde1e7;
+  --lb-button: #f2f4f7;
+  --lb-button-hover: #e8ebf0;
+  --lb-input: #ffffff;
+  --lb-primary: #2f6fed;
+  --lb-error: #b3261e;
+}
+.linkr-gui header { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--lb-line); flex: none; }
 .linkr-gui header .name { font-size: 12px; font-weight: 600; }
 .linkr-gui header .spacer { flex: 1 1 auto; }
-.linkr-gui button { appearance: none; border: 1px solid #303845; background: #1b212a; color: #e7ebf2; border-radius: 6px; padding: 3px 8px; font-size: 11px; cursor: pointer; }
-.linkr-gui button:hover { background: #232b36; }
+.linkr-gui button { appearance: none; border: 1px solid var(--lb-line); background: var(--lb-button); color: var(--lb-fg); border-radius: 6px; padding: 3px 8px; font-size: 11px; cursor: pointer; }
+.linkr-gui button:hover { background: var(--lb-button-hover); }
+.linkr-gui button:disabled { opacity: .5; cursor: default; }
 .linkr-gui .frame { flex: 1 1 auto; min-height: 0; background: #07090c; }
 .linkr-gui iframe { display: block; width: 100%; height: 100%; border: 0; background: #07090c; }
-.linkr-gui .status { padding: 14px; font-size: 12px; color: #9aa4b2; }
-.linkr-gui .status.error { color: #ffb4ae; }
+.linkr-gui .status { padding: 14px; font-size: 12px; color: var(--lb-muted); }
+.linkr-gui .status.error { color: var(--lb-error); }
+.linkr-gui .settings { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-bottom: 1px solid var(--lb-line); flex: none; }
+.linkr-gui .settings label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--lb-muted); }
+.linkr-gui .settings input, .linkr-gui .settings select { background: var(--lb-input); color: var(--lb-fg); border: 1px solid var(--lb-line); border-radius: 6px; padding: 4px 6px; font: inherit; font-size: 12px; }
+.linkr-gui .settings-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 2px; }
+.linkr-gui .settings .primary { background: var(--lb-primary); border-color: var(--lb-primary); color: #fff; }
+.linkr-gui .settings .notice { margin: 0; font-size: 11px; color: var(--lb-error); }
