@@ -237,16 +237,39 @@ async function setupCodex(args, env, password) {
   return { harness: 'codex', action: 'write', applied: true, configFile: path, backup: written.backup };
 }
 
+/**
+ * OpenCode 2 moved servers from `mcp.<name>` to `mcp.servers.<name>` and replaced
+ * `enabled` with `disabled`. Detect the installed major version; when the CLI is
+ * not installed, write the current (2.x) shape, which is what the docs describe.
+ */
+async function opencodeMajorVersion() {
+  const probe = await run('opencode', ['--version']);
+  const text = `${probe.stdout}\n${probe.stderr}`;
+  const match = /(\d+)\.\d+/.exec(text);
+  return match ? Number(match[1]) : 0;
+}
+
 async function setupOpencode(args, env) {
   const project = resolve(args.project || process.cwd());
   const path = join(project, 'opencode.json');
   const current = await readJson(path);
   if (current.invalid) {
-    throw new Error(`${path} is not strict JSON (OpenCode also accepts JSONC); edit mcp.linkr by hand from opencode/opencode.json.example`);
+    throw new Error(`${path} is not strict JSON (OpenCode also accepts JSONC); edit the linkr entry by hand from opencode/opencode.json.example`);
   }
   const next = current.value ?? { $schema: 'https://opencode.ai/config.json' };
+  const major = await opencodeMajorVersion();
+  const v2 = major === 0 || major >= 2;
   const mcp = { ...(next.mcp ?? {}) };
-  mcp.linkr = { type: 'local', command: [process.execPath, SERVER], environment: env, enabled: true };
+  if (v2) {
+    // A flat `mcp.linkr` from 1.x is invisible to 2.x; keep only the new shape.
+    delete mcp.linkr;
+    mcp.servers = {
+      ...(mcp.servers ?? {}),
+      linkr: { type: 'local', command: [process.execPath, SERVER], environment: env },
+    };
+  } else {
+    mcp.linkr = { type: 'local', command: [process.execPath, SERVER], environment: env, enabled: true };
+  }
   next.mcp = mcp;
   const content = `${JSON.stringify(next, null, 2)}\n`;
   if (args.dryRun) return { harness: 'opencode', action: 'write', applied: false, configFile: path, preview: content };
@@ -358,7 +381,8 @@ async function main() {
       '',
       'Verify:',
       '  codex mcp list          # expect linkr',
-      '  opencode mcp list       # expect linkr connected (run inside the project)',
+      '  opencode --standalone debug config   # OpenCode 2.x: look for mcp.servers.linkr',
+      '  opencode mcp list       # OpenCode 1.x only: expect linkr connected (inside the project)',
       '  mimo mcp list           # expect linkr connected (run inside the project)',
       '  mcode mcp list --human  # MiniMaxCode',
       '',

@@ -43,12 +43,14 @@ harness, without spending model tokens:
 
 | Harness | Command | Server methods observed |
 | --- | --- | --- |
-| OpenCode 1.18.35 | `opencode mcp list` | `initialize`, `notifications/initialized`, `tools/list` |
+| OpenCode 2.2.7 | `opencode run` (real run) | `initialize`, `notifications/initialized`, `tools/list`, `tools/call` |
 | MiMoCode 0.1.15 | `mimo mcp list` | `initialize`, `notifications/initialized`, `tools/list` |
 | Codex 0.166.0 | `codex mcp list` | none — the command only reads the config; Codex connects the server when a session starts, which the real run in [`E2E-CODEX.md`](E2E-CODEX.md) proved |
 | MiniMaxCode 0.7.6 | `mcode mcp` has only login/logout | not observable this way |
 
-So OpenCode and MiMoCode discover both tools (`tools/list`) as part of loading the server; Codex
+OpenCode 2.2.7's `mcp list` does not report project-config servers, so its row comes from a real run
+(2.2.7 still sends the same handshake). So OpenCode and MiMoCode discover both tools (`tools/list`)
+as part of loading the server; Codex
 discovery and tool invocation are covered by the end-to-end run.
 
 `LINKR_MCP_LOG_FILE` is a debugging aid, not a state file: it only appends method names and errors

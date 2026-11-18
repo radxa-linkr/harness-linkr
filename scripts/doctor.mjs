@@ -214,22 +214,59 @@ async function checkHarnesses() {
     add('SKIP', 'codex', 'not installed');
   }
 
-  // OpenCode / MiMoCode: both read a project config and expose `mcp list`.
-  for (const [command, harness, file] of [
-    ['opencode', 'opencode', 'opencode.json'],
-    ['mimo', 'mimocode', 'mimocode.json'],
-  ]) {
-    if (!(await hasCommand(command))) {
-      const projectFile = await exists(join(process.cwd(), file));
-      if (projectFile) add('WARN', harness, `installed config found (${file}) but ${command} is not on PATH`);
-      else add('SKIP', harness, 'not installed');
-      continue;
+  // OpenCode 2.x no longer reports project config in `mcp list`, so read the
+  // config it loads: project opencode.json/.jsonc, then the global one.
+  {
+    const candidates = [
+      join(process.cwd(), 'opencode.json'),
+      join(process.cwd(), 'opencode.jsonc'),
+      join(homedir(), '.config', 'opencode', 'opencode.json'),
+      join(homedir(), '.config', 'opencode', 'opencode.jsonc'),
+    ];
+    const hasLinkr = async (file) => {
+      const text = await readFile(file, 'utf8');
+      try {
+        const config = JSON.parse(text);
+        return Boolean(config?.mcp?.servers?.linkr ?? config?.mcp?.linkr);
+      } catch {
+        // JSONC: a text check is enough to say the entry is there.
+        return /"linkr"\s*:/.test(text);
+      }
+    };
+    if (await hasCommand('opencode')) {
+      const version = clean((await run('opencode', ['--version'])).stdout ?? '');
+      let found = '';
+      for (const file of candidates) {
+        if (!(await exists(file))) continue;
+        try {
+          if (await hasLinkr(file)) {
+            found = file;
+            break;
+          }
+        } catch {
+          // unreadable config: keep looking
+        }
+      }
+      if (found !== '') add('PASS', 'opencode', `linkr MCP server configured in ${found}${version ? ` (${version.trim()})` : ''}`);
+      else add('WARN', 'opencode', 'installed but no linkr MCP entry', 'node scripts/setup.mjs --harness opencode --username <account> --project .');
+    } else {
+      let found = '';
+      for (const file of candidates) if (await exists(file)) found = file;
+      if (found !== '') add('WARN', 'opencode', `config found (${found}) but opencode is not on PATH`);
+      else add('SKIP', 'opencode', 'not installed');
     }
-    const list = await run(command, ['mcp', 'list'], { cwd: process.cwd() });
+  }
+
+  // MiMoCode: project config plus `mcp list`.
+  if (!(await hasCommand('mimo'))) {
+    if (await exists(join(process.cwd(), 'mimocode.json'))) add('WARN', 'mimocode', 'installed config found (mimocode.json) but mimo is not on PATH');
+    else add('SKIP', 'mimocode', 'not installed');
+  } else {
+    const list = await run('mimo', ['mcp', 'list'], { cwd: process.cwd() });
     const text = clean(`${list.stdout}\n${list.stderr}`);
-    if (/\blinkr\b/.test(text) && /connected/i.test(text)) add('PASS', harness, 'linkr MCP server configured and connected');
-    else if (/\blinkr\b/.test(text)) add('WARN', harness, 'linkr configured but not connected', `check the device and run ${command} mcp list again`);
-    else add('WARN', harness, 'installed but no linkr MCP entry', `node scripts/setup.mjs --harness ${harness} --username <account> --project .`);
+    if (/\blinkr\b/.test(text) && /connected/i.test(text)) add('PASS', 'mimocode', 'linkr MCP server configured and connected');
+    else if (/\blinkr\b/.test(text)) add('WARN', 'mimocode', 'linkr configured but not connected', 'check the device and run mimo mcp list again');
+    else add('WARN', 'mimocode', 'installed but no linkr MCP entry', 'node scripts/setup.mjs --harness mimocode --username <account> --project .');
   }
 
   // MiniMaxCode: no `mcp list` command (0.7.x); only its files can be checked.

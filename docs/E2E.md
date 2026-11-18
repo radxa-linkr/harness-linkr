@@ -10,7 +10,7 @@ the code. The device in every check was a Radxa Linkr at `http://linkr.local` (f
 | --- | --- | --- | --- | --- |
 | DeepSeek Harness | yes (plugin) | yes | yes | right-column panel + agent tools verified since the first round |
 | Codex 0.166.0 | yes (`codex mcp list`) | yes (during the run) | **yes** — `DEVICE=admin`, `FRAME=1920x1080` | [E2E-CODEX.md](E2E-CODEX.md) · [adapter](../codex/README.md) |
-| OpenCode 1.18.35 | yes (`opencode mcp list` → connected) | yes (`tools/list` observed) | **yes** — `DEVICE=admin`, `FRAME=1920x1080` | [E2E-OPENCODE.md](E2E-OPENCODE.md) · [adapter](../opencode/README.md) |
+| OpenCode 2.2.7 | yes (`opencode --standalone debug config` shows `mcp.servers.linkr`) | yes (`tools/list` observed) | **yes** — `DEVICE=admin`, `FRAME=1920x1080` | [E2E-OPENCODE.md](E2E-OPENCODE.md) · [adapter](../opencode/README.md) |
 | MiMoCode 0.1.15 | yes (`mimo mcp list` → connected) | yes (`tools/list` observed) | **blocked** — `Invalid API Key` from this machine's MiMo credentials | below · [adapter](../mimocode/README.md) |
 | MiniMaxCode 0.7.6 | config shape checked against the CLI's parser | n/a (no `mcp list` in 0.7.6) | **blocked** — CLI not installed here | [../minimaxcode/README.md](../minimaxcode/README.md) |
 

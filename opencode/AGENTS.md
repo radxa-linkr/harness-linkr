@@ -10,7 +10,8 @@ This environment can drive **another real computer** behind a Linkr KVM-over-IP 
 `linkr` MCP server. Nothing here operates on the machine you are running on: the captures show the
 controlled host, and clicks and keystrokes are injected into it over USB HID.
 
-Tools (OpenCode may show them with the server name as a prefix, e.g. `linkr_linkr_computer_use` —
+Tools (OpenCode 2.x exposes them inside its code sandbox as `tools.linkr.linkr_status` /
+`tools.linkr.linkr_computer_use`; older views show the server-prefixed `linkr_linkr_computer_use` —
 same tools):
 
 - `linkr_status` — read-only. Device name/firmware, codec, whether a screen session is live, frame

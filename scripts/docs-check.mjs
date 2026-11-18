@@ -250,13 +250,15 @@ check('codex/config.toml.example has the expected TOML entry', () => {
   }
 });
 
-check('opencode/opencode.json.example parses and points at the server', () => {
+check('opencode/opencode.json.example parses and points at the server (2.x shape)', () => {
   const config = jsonExample('opencode/opencode.json.example');
-  const entry = config?.mcp?.linkr;
-  if (!entry) throw new Error('no mcp.linkr entry');
+  const entry = config?.mcp?.servers?.linkr;
+  if (!entry) throw new Error('no mcp.servers.linkr entry (OpenCode 2.x shape)');
+  if (config.mcp?.linkr) throw new Error('a flat mcp.linkr entry is the 1.x shape and invisible to OpenCode 2');
   if (entry.type !== 'local') throw new Error(`type is ${entry.type}`);
   if (!Array.isArray(entry.command) || !entry.command.join(' ').includes('mcp-linkr/index.js')) throw new Error('command does not launch mcp-linkr/index.js');
   for (const key of ['LINKR_BASE_URL', 'LINKR_USERNAME']) if (!entry.environment?.[key]) throw new Error(`environment.${key} missing`);
+  if (entry.enabled !== undefined) throw new Error('OpenCode 2 uses `disabled`, not `enabled`');
 });
 
 check('mimocode/mimocode.jsonc.example parses as JSONC and points at the server', () => {

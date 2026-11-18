@@ -12,7 +12,7 @@ is the device protocol and the behaviour rules, not code.
 | [`dsh-linkr/`](dsh-linkr/) | [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) | native plugin (tools + right-column panel) | Working, verified against fw 1.6.0 (clipboard paste needs fw 1.7.0) |
 | [`mcp-linkr/`](mcp-linkr/) | any MCP client | stdio MCP server (shared by the adapters below) | Working, smoke-tested against a fake device and a real device |
 | [`codex/`](codex/) | Codex desktop / CLI | local plugin + MCP App | Live thread panel, passive viewing and explicit human takeover; the earlier CLI capture was **end-to-end through a real Codex run** — see [`docs/E2E-CODEX.md`](docs/E2E-CODEX.md) |
-| [`opencode/`](opencode/) | OpenCode | MCP server | Config verified and **end-to-end through a real OpenCode run** — see [`docs/E2E-OPENCODE.md`](docs/E2E-OPENCODE.md) |
+| [`opencode/`](opencode/) | OpenCode | MCP server | Verified with **2.2.7** (`mcp.servers.linkr`) and **end-to-end through a real OpenCode run** — see [`docs/E2E-OPENCODE.md`](docs/E2E-OPENCODE.md) |
 | [`mimocode/`](mimocode/) | MiMoCode | MCP server | Config + tools/list verified; model run blocked by this machine's MiMo credentials (see [`docs/E2E.md`](docs/E2E.md)) |
 | [`minimaxcode/`](minimaxcode/) | MiniMaxCode | MCP server | Config shape checked against the installed CLI (0.7.6) and its own parser; runtime needs a model (`mcode` has no `mcp list` in 0.7.6) |
 

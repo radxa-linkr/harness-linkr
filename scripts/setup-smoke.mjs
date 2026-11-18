@@ -106,10 +106,14 @@ async function main() {
     assert.match(codexConfig, /LINKR_BASE_URL = "http:\/\/linkr\.local"/);
 
     const opencode = readJson(join(project, 'opencode.json'));
-    assert.equal(opencode.mcp.linkr.type, 'local');
-    assert.deepEqual(opencode.mcp.linkr.command, [process.execPath, server]);
-    assert.equal(opencode.mcp.linkr.environment.LINKR_USERNAME, 'tester');
-    assert.equal(opencode.mcp.linkr.enabled, true);
+    // OpenCode 2 moves servers under mcp.servers; 1.x keeps them under mcp.
+    const opencodeEntry = opencode.mcp?.servers?.linkr ?? opencode.mcp?.linkr;
+    assert.ok(opencodeEntry, 'no linkr entry under mcp.servers.linkr or mcp.linkr');
+    assert.equal(opencodeEntry.type, 'local');
+    assert.deepEqual(opencodeEntry.command, [process.execPath, server]);
+    assert.equal(opencodeEntry.environment.LINKR_USERNAME, 'tester');
+    if (opencode.mcp?.servers?.linkr) assert.notEqual(opencodeEntry.disabled, true, 'the 2.x entry must not be disabled');
+    else assert.equal(opencodeEntry.enabled, true);
 
     const mio = readJson(join(project, 'mimocode.json'));
     assert.deepEqual(mio.mcp.linkr.command, [process.execPath, server]);
@@ -132,7 +136,9 @@ async function main() {
     const codexConfig = readFileSync(join(env.CODEX_HOME, 'config.toml'), 'utf8');
     assert.equal(codexConfig.match(/\[mcp_servers\.linkr\]/g).length, 1);
     const opencode = readJson(join(project, 'opencode.json'));
-    assert.equal(Object.keys(opencode.mcp).filter((name) => name === 'linkr').length, 1);
+    const opencodeEntries = [opencode.mcp?.servers?.linkr, opencode.mcp?.linkr].filter(Boolean);
+    assert.equal(opencodeEntries.length, 1, `expected one linkr entry, got ${opencodeEntries.length}`);
+    assert.ok(!(opencode.mcp?.servers?.linkr && opencode.mcp?.linkr), '1.x and 2.x entries must not coexist');
     assert.ok(readdirSync(project).some((file) => file.includes('.bak-')), 'no backup was kept');
   });
 
@@ -193,7 +199,6 @@ async function main() {
 
   for (const harness of [
     { name: 'codex', args: ['mcp', 'list'], expect: /linkr/ },
-    { name: 'opencode', args: ['mcp', 'list'], expect: /linkr/, cwd: project },
     { name: 'mimo', args: ['mcp', 'list'], expect: /linkr/, cwd: project },
   ]) {
     const available = await commandAvailable(harness.name);
@@ -214,6 +219,30 @@ async function main() {
       assert.match(text, harness.expect, `${harness.name} mcp list did not mention linkr:\n${text.slice(0, 400)}`);
     });
   }
+
+  await check('opencode: the configured server is visible to the CLI', async () => {
+    if (!(await commandAvailable('opencode'))) {
+      console.log('      (skipped: opencode is not installed)');
+      return;
+    }
+    const version = await run('opencode', ['--version'], { cwd: project, env: { XDG_CONFIG_HOME: env.XDG_CONFIG_HOME } });
+    const major = Number((/(\d+)\.\d+/.exec(`${version.stdout}\n${version.stderr}`) ?? [])[1] ?? 0);
+    if (major >= 2) {
+      // 2.x `mcp list` does not report project servers; `debug config` prints
+      // the resolved config, which is the same thing the agent will load.
+      const result = await run('opencode', ['--standalone', 'debug', 'config'], { cwd: project, env: { XDG_CONFIG_HOME: env.XDG_CONFIG_HOME } });
+      const text = `${result.stdout}\n${result.stderr}`.replace(/\x1b\[[0-9;]*m/g, '');
+      if (/Managed service port|already in use by PID/i.test(text)) {
+        console.log('      (skipped: OpenCode desktop service owns the CLI socket)');
+        return;
+      }
+      assert.match(text, /"linkr"/, `opencode 2.x did not load the linkr server:\n${text.slice(0, 400)}`);
+      return;
+    }
+    const result = await run('opencode', ['mcp', 'list'], { cwd: project, env: { XDG_CONFIG_HOME: env.XDG_CONFIG_HOME } });
+    const text = `${result.stdout}\n${result.stderr}`.replace(/\x1b\[[0-9;]*m/g, '');
+    assert.match(text, /linkr/, `opencode 1.x mcp list did not mention linkr:\n${text.slice(0, 400)}`);
+  });
 
   await check('a missing password source fails with a clear message', async () => {
     const clean = await run(process.execPath, [SETUP, '--harness', 'opencode', '--username', 'tester', '--project', project], {

@@ -1,8 +1,8 @@
 # Linkr for OpenCode
 
 > **Quick install from the repository root:** `node scripts/setup.mjs --harness opencode --username <device-account> --project .` — it writes this config with a
-> backup, and `--dry-run` shows what it would change.
-
+> backup, and `--dry-run` shows what it would change. The config shape is chosen from
+> `opencode --version` (2.x writes `mcp.servers.linkr`; 1.x writes `mcp.linkr`).
 
 Give [OpenCode](https://opencode.ai) the eyes and hands of a real computer behind a **Linkr
 KVM-over-IP device**: capture the controlled host's screen, and click/type into it through the
@@ -14,8 +14,8 @@ OpenCode launches the server as a local stdio MCP server; the server exposes `li
 
 ## Prerequisites
 
-- OpenCode. Verified here with **1.18.35**. (The current OpenCode docs describe the newer V2 config
-  shape — see [Version note](#version-note).)
+- **OpenCode 2.x** (verified here with **2.2.7**). The 1.x shape is shown where it differs; 1.18.35
+  was the earlier reference.
 - **Node.js ≥ 22** on this machine (the MCP server runs locally).
 - A Linkr device reachable on your network, and its web login (the same account you use at
   `http://<device>/`).
@@ -29,8 +29,7 @@ OpenCode launches the server as a local stdio MCP server; the server exposes `li
 OpenCode reads MCP servers from its config file:
 
 - **project**: `opencode.json` in the project root — recommended, keeps the KVM in one repo;
-- **global**: `~/.config/opencode/opencode.json` (`~/.config/opencode/opencode.jsonc` is also read;
-  the CLI creates the `.jsonc` form).
+- **global**: `~/.config/opencode/opencode.json` (`.jsonc` is also read).
 
 The server is one file: `<absolute path to harness-linkr>/mcp-linkr/index.js`. From the
 `harness-linkr` checkout, `pwd` gives the prefix:
@@ -43,25 +42,34 @@ pwd    # → the absolute path of this checkout
 ### Option A — project config (recommended)
 
 Copy [`opencode.json.example`](opencode.json.example) to `<project>/opencode.json` and edit the
-absolute path and device values. The `mcp` entry has this shape (verified with 1.18.35 — `opencode
-mcp list` showed `linkr connected`):
+absolute path and device values. **OpenCode 2.x** keeps servers under `mcp.servers` (verified with
+2.2.7, including a real tool call):
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
-    "linkr": {
-      "type": "local",
-      "command": ["node", "/absolute/path/to/harness-linkr/mcp-linkr/index.js"],
-      "environment": {
-        "LINKR_BASE_URL": "http://linkr.local",
-        "LINKR_USERNAME": "admin",
-        "LINKR_PASSWORD": "the-device-password"
-      },
-      "enabled": true
+    "servers": {
+      "linkr": {
+        "type": "local",
+        "command": ["node", "/absolute/path/to/harness-linkr/mcp-linkr/index.js"],
+        "environment": {
+          "LINKR_BASE_URL": "http://linkr.local",
+          "LINKR_USERNAME": "admin",
+          "LINKR_PASSWORD": "the-device-password"
+        }
+      }
     }
   }
 }
+```
+
+To keep the server configured but not connected, add `"disabled": true` (2.x replaced 1.x's
+`enabled`). The 1.x shape, if you still run 1.18.x, is a flat entry and an explicit boolean:
+
+```json
+{ "mcp": { "linkr": { "type": "local", "command": ["node", "…/mcp-linkr/index.js"],
+  "environment": { "LINKR_BASE_URL": "http://linkr.local", "LINKR_USERNAME": "admin" }, "enabled": true } } }
 ```
 
 Environment variables in `environment` are added on top of OpenCode's own process environment, so
@@ -69,7 +77,8 @@ you can also leave `LINKR_PASSWORD` out of the file and export it in the shell t
 
 ### Option B — CLI
 
-`opencode mcp add` understands a local stdio server:
+`opencode mcp add` understands a local stdio server. On 2.2.7 it writes the **project**
+`opencode.json` under `mcp.servers` (verified); add `--global` for the global config:
 
 ```sh
 opencode mcp add linkr \
@@ -79,25 +88,18 @@ opencode mcp add linkr \
   -- node /absolute/path/to/harness-linkr/mcp-linkr/index.js
 ```
 
-On **1.18.35** it writes the **global** `~/.config/opencode/opencode.jsonc` (there is no `--global`
-flag in this version, and it does not touch the project file — verified), so prefer Option A if you
-want the server scoped to a repository.
-
 ### Check it
 
 ```sh
-opencode mcp list        # → ● ✓ linkr connected  (or ✗ failed + the error)
-opencode debug config    # resolved config; secrets are masked
+opencode --standalone debug config   # 2.x: resolved config, secrets masked — look for mcp.servers.linkr
+opencode mcp list                    # 1.x only
 ```
 
-Start a new OpenCode session afterwards (or restart the server) — MCP servers connect at startup.
-
-### Version note
-
-1.18.35 uses the shape above: server names directly under `mcp`, `type: "local"`, an `enabled`
-boolean. The **newer OpenCode docs (V2)** move servers under `mcp.servers` and replace `enabled` with
-`disabled`. If `opencode mcp list` does not show `linkr` after upgrading, translate the entry to
-your version's docs: <https://opencode.ai/docs/mcp-servers/>.
+**OpenCode 2.2.7 note:** `opencode mcp list` does not report project-configured servers (it answers
+"No MCP servers configured" even when the server is loaded — verified). `debug config` shows the
+config the app really uses, and the end-to-end run in
+[`../docs/E2E-OPENCODE.md`](../docs/E2E-OPENCODE.md) proves the tools are callable. Start a new
+OpenCode session after editing the config; servers connect at startup.
 
 ## Environment variables
 
@@ -122,14 +124,14 @@ node /absolute/path/to/harness-linkr/mcp-linkr/index.js --version
 LINKR_BASE_URL=http://linkr.local LINKR_USERNAME=admin LINKR_PASSWORD='the-device-password' \
   node /absolute/path/to/harness-linkr/mcp-linkr/index.js --status
 
-# 3) OpenCode sees the server (run inside the project that has opencode.json)
-opencode mcp list
+# 3) the harness resolves the server (project directory):
+opencode --standalone debug config          # 2.x
+opencode mcp list                           # 1.x
 ```
 
 `--status` is read-only and never starts a capture. A wrong address, account, or unplugged device
 just prints `problem: …`; that is the same sentence the tools return. **The server is safe to start
-without a device** — `opencode mcp list` shows `linkr connected` whenever the server process starts
-and handshakes, independent of the device.
+without a device** — the harness's MCP client handshakes and lists tools independently of the device.
 
 ## Using it in an OpenCode session
 
@@ -138,6 +140,11 @@ size, then acts on that frame:
 
 > Capture the controlled host, then click the "Login" button. Take the button's pixels from the
 > capture you got, and capture again afterwards so I can see the result.
+
+OpenCode 2.x runs tools inside its code sandbox, where MCP tools are namespaced as
+`tools.linkr.linkr_status` / `tools.linkr.linkr_computer_use` (the agent may ask for an `execute`
+step first; that is normal). Older builds and some views show the server-prefixed form
+(`linkr_linkr_computer_use`). Same tools either way.
 
 The rules the model should follow (also in [`AGENTS.md`](AGENTS.md)):
 
@@ -162,8 +169,11 @@ project's `AGENTS.md` or the global one.
 
 ## What this adapter was verified against
 
-- `opencode 1.18.35` with the real `mcp-linkr` server: a project `opencode.json` using the shape above
-  was resolved by `opencode debug config`, and `opencode mcp list` reported `● ✓ linkr connected`
-  with the server's command line. `opencode mcp add linkr --env … -- node …/mcp-linkr/index.js` was
-  also verified — it writes the global `~/.config/opencode/opencode.jsonc`; that test addition was
-  removed and the user's global config restored.
+- **`opencode 2.2.7`** with the real `mcp-linkr` server and a real device: a project `opencode.json`
+  using `mcp.servers.linkr` was resolved by `opencode --standalone debug config`; a free-model run
+  (`opencode/deepseek-v4.1-flash-free`) called `tools.linkr.linkr_status` and
+  `tools.linkr.linkr_computer_use` and answered `DEVICE=… / FRAME=1920x1080`. The server side
+  observed `initialize`, `notifications/initialized`, `tools/list`, `tools/call` — see
+  [`../docs/E2E-OPENCODE.md`](../docs/E2E-OPENCODE.md).
+- **1.18.35** (historical): the flat `mcp.linkr` + `enabled` shape; `opencode mcp list` reported
+  `● ✓ linkr connected`.
