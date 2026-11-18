@@ -28,6 +28,7 @@
   let retry = null;
   let fit = true;
   let busy = false;
+  let streamed = false;
   let lastPoint = null;
   let dragStart = null;
   let dragged = false;
@@ -108,11 +109,13 @@
   }
 
   frame.addEventListener('load', () => {
+    streamed = true;
     hint.hidden = true;
     setStatus('on', '已连接 · 实时画面');
   });
   frame.addEventListener('error', () => {
     if (frame.hidden) return;
+    streamed = false;
     reportPanelError('stream failed');
     setStatus('err', '未连接或设备不可达');
     hint.hidden = false;
@@ -230,6 +233,7 @@
   $('disconnect').addEventListener('click', async () => {
     try {
       await api('/input.json', { action: 'disconnect' });
+      streamed = false;
       frame.hidden = true;
       frame.removeAttribute('src');
       hint.hidden = false;
@@ -283,11 +287,20 @@
     try {
       const payload = await api('/state.json');
       const state = payload.state || {};
-      if (state.connected) {
+      if (typeof payload.error === 'string' && payload.error !== '') {
+        setStatus('err', '连接失败');
+        hint.hidden = false;
+        hint.textContent = payload.error;
+        return;
+      }
+      // A frame already on screen is the truth; the state poll can lag a
+      // reconnect and must not flip the panel back to "waiting".
+      if (state.connected || streamed) {
         setStatus('on', '已连接');
         metrics.textContent = [state.codec && state.codec.toUpperCase(), state.width && state.height ? `${state.width}×${state.height}` : '', state.fps ? `${state.fps} fps` : ''].filter(Boolean).join(' · ') || '—';
       } else if (!frame.hidden) {
         setStatus('warn', '等待画面…');
+        metrics.textContent = '—';
       }
       renderActivity(payload.activity);
     } catch {

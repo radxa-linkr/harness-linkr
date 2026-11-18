@@ -64,6 +64,7 @@ export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, f
   let stopFrames = null;
   let lastFrame = null;
   let lastBroadcastAt = 0;
+  let lastError = '';
   let closed = false;
 
   const interval = 1000 / Math.max(1, Math.min(30, Number(fps) || 10));
@@ -90,6 +91,7 @@ export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, f
     if (stopFrames !== null || typeof tools.onFrame !== 'function') return;
     stopFrames = tools.onFrame((frame) => {
       lastFrame = frame;
+      lastError = '';
       broadcast(frame);
     });
   }
@@ -128,7 +130,9 @@ export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, f
     try {
       await ensureSession();
     } catch (error) {
-      response.write(Buffer.from(`--${BOUNDARY}\r\nContent-Type: text/plain\r\n\r\n${String(error?.message ?? error)}\r\n`));
+      lastError = String(error?.message ?? error);
+      response.write(Buffer.from(`--${BOUNDARY}\r\nContent-Type: text/plain\r\n\r\n${lastError}\r\n`));
+      response.end();
       subscribers.delete(response);
       return;
     }
@@ -153,6 +157,7 @@ export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, f
     const size = lastFrame !== null ? { width: lastFrame.width ?? 0, height: lastFrame.height ?? 0 } : { width: 0, height: 0 };
     return {
       ok: true,
+      error: lastError,
       state: {
         connected: Boolean(state.connected),
         codec: typeof state.codec === 'string' ? state.codec : '',

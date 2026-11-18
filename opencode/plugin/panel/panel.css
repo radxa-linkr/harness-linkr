@@ -75,3 +75,6 @@ body.embed #frame { max-height: none; }
   :root:not([data-theme]) .toast { background: #fdecea; border-color: #f3c7c2; color: #7a241c; }
   :root:not([data-theme]) .toast.ok { background: #e8f7ee; border-color: #b9e3c8; color: #14532d; }
 }
+
+/* The hidden attribute must win over the display rules above. */
+.paste-box[hidden], #frame[hidden], #hint[hidden], #toast[hidden] { display: none !important; }

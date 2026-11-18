@@ -136,5 +136,31 @@ await check('disconnect calls stop; close releases the server', async () => {
   await assert.rejects(fetch(server.url));
 });
 
+await check('a failed session surfaces its sentence in /state.json', async () => {
+  const failing = {
+    async callTool() {
+      return { content: [{ type: 'text', text: 'another local Linkr session holds the device lease' }], isError: true };
+    },
+    onFrame() {
+      return () => {};
+    },
+    panelState() {
+      return { state: { connected: false }, activity: [] };
+    },
+    async stop() {},
+  };
+  const failingServer = await createPanelServer({ tools: failing, fps: 10 });
+  const controller = new AbortController();
+  const stream = await fetch(new URL('/stream?t=' + failingServer.token, failingServer.url), { signal: controller.signal });
+  const reader = stream.body.getReader();
+  const first = await reader.read();
+  controller.abort();
+  assert.match(Buffer.from(first.value ?? '').toString('latin1'), /device lease/);
+  const state = await (await fetch(new URL('/state.json?t=' + failingServer.token, failingServer.url))).json();
+  assert.match(state.error, /device lease/);
+  assert.equal(state.state.connected, false);
+  await failingServer.close();
+});
+
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILED`);
 process.exit(failures === 0 ? 0 : 1);
