@@ -1,0 +1,31 @@
+{
+  "name": "opencode-linkr",
+  "version": "0.1.0",
+  "description": "Linkr KVM as an OpenCode 2.x native plugin: linkr_status and linkr_computer_use as first-class agent tools, backed by the shared Linkr transport.",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22",
+    "opencode": ">=2.2.0"
+  },
+  "keywords": [
+    "opencode-plugin",
+    "opencode",
+    "linkr",
+    "kvm",
+    "computer-use"
+  ],
+  "license": "GPL-3.0-only",
+  "dependencies": {
+    "@opencode/plugin": "2.2.7"
+  }
+}

@@ -261,6 +261,19 @@ check('opencode/opencode.json.example parses and points at the server (2.x shape
   if (entry.enabled !== undefined) throw new Error('OpenCode 2 uses `disabled`, not `enabled`');
 });
 
+check('opencode native plugin package is complete', () => {
+  const pkg = JSON.parse(read('opencode/plugin/package.json'));
+  if (pkg.name !== 'opencode-linkr') throw new Error(`unexpected name ${pkg.name}`);
+  if (!String(pkg.engines?.opencode ?? '').includes('2.')) throw new Error('engines.opencode must require OpenCode 2');
+  if (!Array.isArray(pkg.files) || !pkg.files.includes('index.js')) throw new Error('files must ship index.js');
+  if (pkg.dependencies?.['@opencode/plugin'] === undefined) throw new Error('@opencode/plugin dependency missing');
+  const index = read('opencode/plugin/index.js');
+  if (!index.includes('Plugin.define')) throw new Error('index.js does not define a Plugin');
+  for (const tool of ['linkr_status', 'linkr_computer_use']) if (!index.includes(tool)) throw new Error(`index.js does not register ${tool}`);
+  if (!exists('opencode/plugin/README.md')) throw new Error('opencode/plugin/README.md is missing');
+  if (!exists('opencode/plugin/LICENSE')) throw new Error('opencode/plugin/LICENSE is missing');
+});
+
 check('mimocode/mimocode.jsonc.example parses as JSONC and points at the server', () => {
   const config = jsonExample('mimocode/mimocode.jsonc.example', { jsonc: true });
   const entry = config?.mcp?.linkr;

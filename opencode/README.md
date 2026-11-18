@@ -12,6 +12,19 @@ This folder is the OpenCode adapter for the shared MCP stdio server in [`../mcp-
 OpenCode launches the server as a local stdio MCP server; the server exposes `linkr_status` and
 `linkr_computer_use`.
 
+### Two ways to use it
+
+| | MCP server (this page) | Native plugin ([`plugin/`](plugin/)) |
+| --- | --- | --- |
+| Process | OpenCode spawns `mcp-linkr/index.js` as a stdio MCP server | runs in-process inside OpenCode; no MCP |
+| Config | `mcp.servers.linkr` in `opencode.json` (2.x) | `plugins` entry pointing at `opencode/plugin` |
+| Tools | namespaced in the sandbox (`tools.linkr.linkr_status`) | first-class (`tools.linkr_status`) |
+| Shared with | Codex / MiMoCode / MiniMaxCode / DSH (same server) | this checkout only |
+
+Both are verified with **opencode 2.2.7**. Use the MCP adapter when one setup should serve every
+harness; use the native plugin when you want no extra process and don't need the shared server.
+The native plugin has its own options and caveats: [`plugin/README.md`](plugin/README.md).
+
 ## Prerequisites
 
 - **OpenCode 2.x** (verified here with **2.2.7**). The 1.x shape is shown where it differs; 1.18.35

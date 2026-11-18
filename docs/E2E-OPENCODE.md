@@ -78,3 +78,37 @@ node scripts/setup.mjs --harness opencode --username <account> --password-file <
 cd <project> && opencode --standalone debug config | grep -A3 linkr
 opencode run --standalone -m <model> 'Call linkr_status and reply DEVICE=<deviceName>.'
 ```
+
+
+## Native plugin (same day, second path)
+
+A native OpenCode 2 plugin was added next to the MCP adapter: [`opencode/plugin`](../opencode/plugin/)
+(package `opencode-linkr`), loaded from a project config — no MCP process.
+
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "file:///…/harness-linkr/opencode/plugin",
+      "options": { "baseUrl": "http://linkr.local", "username": "admin", "passwordFile": "…" }
+    }
+  ]
+}
+```
+
+`opencode --standalone debug config` lists the `plugins` entry (and the global
+`opencode-linkr-bee` plugin, which was left untouched). A free-model run with the real device:
+
+```
+> build · deepseek-v4.1-flash-free
+⚙ execute {"code":"const status = await tools.linkr_status();\nreturn status;"}
+⚙ execute {"code":"const cap = await tools.linkr_computer_use({ action: \"capture\" });\nreturn cap;"}
+DEVICE=admin
+FRAME=1920x1080
+```
+
+The native tools are first-class (`tools.linkr_status`, `tools.linkr_computer_use`), not the MCP
+namespace. Captures default to `<project>/.linkr/captures/`; the model read the saved JPEG and
+described the screen ("KDE Plasma desktop … Konsole … pacman"). With the capture directory outside
+the project, the host refuses the file read (`external_directory`), so the plugin only file-references
+a capture that lies inside the session directory.
