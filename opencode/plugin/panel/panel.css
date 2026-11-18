@@ -52,7 +52,11 @@ body.embed .card { padding: 8px; max-width: none; gap: 8px; height: 100%; }
 /* The desktop panel header already carries the title. */
 body.embed .title-row h1 { display: none; }
 body.embed .title-row { gap: 6px; }
-body.embed .activity { display: none; }
+/* The desktop panel keeps the activity list, just tighter. */
+body.embed .activity { padding: 6px 10px; }
+body.embed .activity ul { max-height: 96px; gap: 2px; }
+body.embed .activity li { font-size: 11px; }
+body.embed .activity h2 { margin-bottom: 4px; font-size: 11px; }
 body.embed .hint { padding: 12px; }
 body.embed .stage { flex: 1 1 auto; min-height: 0; }
 body.embed #frame { max-height: none; }
