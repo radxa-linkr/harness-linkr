@@ -57,6 +57,13 @@ no `options`; use the `plugins` entry when you want to pass settings.
 Restart OpenCode (or the server) after changing the config. A plugin that fails to import is
 shown by `opencode --standalone debug config` and in the server logs.
 
+**Desktop app panel:** OpenCode Desktop loads `./gui-experimental` parts from the plugins of the
+server it runs, so put this entry in the **global** `~/.config/opencode/opencode.json(c)` to get the
+sidebar tab in every window. A project-level `opencode.json` entry still gives the agent tools, but
+the desktop panel is not registered from it. Verify with the app's plugin API:
+`curl -u opencode:<service password> http://127.0.0.1:<port>/api/plugin` should list
+`opencode-linkr` with `"gui": true` and `state.status: "active"`.
+
 ## Options
 
 Every option maps 1:1 onto the MCP adapter's environment variable; the environment is used

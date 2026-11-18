@@ -150,3 +150,23 @@ Visual confirmation inside the desktop app could not be automated from here (the
 Screen Recording permission, and the app's webview does not expose its accessibility tree); that
 last check is a manual one: open a project in OpenCode desktop, press **Ctrl+Alt+L** (or use the
 command palette / session panel menu) and the Linkr tab should appear in the session sidebar.
+
+
+## Desktop panel loading requirement (2026-11-18)
+
+A project-level `plugins` entry loads the server part (tools work, as above) but OpenCode Desktop
+does **not** register `./gui-experimental` from it. The GUI part is loaded from the plugins of the
+server the app runs, so the plugin must be configured in the **global**
+`~/.config/opencode/opencode.json(c)`. With the global entry in place, the app's own plugin API
+reports it as loaded for every window:
+
+```
+$ curl -u opencode:<service password> http://127.0.0.1:49374/api/plugin
+{ "id": "opencode-linkr",
+  "source": { "type": "local", "path": "/…/harness-linkr/opencode/plugin" },
+  "features": { "server": true, "gui": true },
+  "state": { "status": "active" } }
+```
+
+The sidebar tab ("Linkr 共享电脑", Ctrl+Alt+L) then appears in the session panel menu next to other
+plugins' panels.
