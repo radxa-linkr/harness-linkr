@@ -48,8 +48,10 @@ h1 { font-size: 14px; font-weight: 600; margin: 0; }
 .toast.ok { background: #14251a; border-color: #245534; color: #c9f2d5; }
 
 /* Embedded in the OpenCode desktop panel: no page chrome, fill the frame. */
-body.embed .card { padding: 6px; max-width: none; gap: 6px; height: 100%; }
-body.embed h1 { font-size: 12px; }
+body.embed .card { padding: 8px; max-width: none; gap: 8px; height: 100%; }
+/* The desktop panel header already carries the title. */
+body.embed .title-row h1 { display: none; }
+body.embed .title-row { gap: 6px; }
 body.embed .activity { display: none; }
 body.embed .hint { padding: 12px; }
 body.embed .stage { flex: 1 1 auto; min-height: 0; }

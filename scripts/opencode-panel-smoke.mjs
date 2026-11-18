@@ -56,22 +56,27 @@ const stub = {
 
 const server = await createPanelServer({ tools: stub, fps: 30 });
 
-await check('the page and assets are served with the token', async () => {
-  const page = await fetch(server.url);
-  assert.equal(page.status, 200);
+await check('the page and its static assets load without a token', async () => {
+  const bare = server.url.split('?')[0];
+  const page = await fetch(bare);
+  assert.equal(page.status, 200, 'the page must load without ?t=');
   const html = await page.text();
   assert.match(html, /Linkr 共享电脑/);
   for (const asset of ['/panel.css', '/panel.js']) {
-    const response = await fetch(new URL(`${asset}?t=${server.token}`, server.url));
+    const response = await fetch(new URL(asset, server.url));
     assert.equal(response.status, 200, `${asset} status ${response.status}`);
     assert.ok((await response.text()).length > 100);
   }
 });
 
-await check('a request without the token is refused', async () => {
-  const bare = server.url.split('?')[0];
-  const response = await fetch(bare);
-  assert.equal(response.status, 403);
+await check('data endpoints require the token', async () => {
+  for (const path of ['/state.json', '/frame.jpg']) {
+    const response = await fetch(new URL(path, server.url));
+    assert.equal(response.status, 403, `${path} status ${response.status}`);
+  }
+  const stream = await fetch(new URL('/stream', server.url));
+  assert.equal(stream.status, 403);
+  await stream.body?.cancel();
 });
 
 await check('the MJPEG stream starts a session and carries JPEG frames', async () => {

@@ -203,16 +203,20 @@ export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, f
   const server = createServer(async (request, response) => {
     try {
       const url = new URL(request.url ?? '/', `http://${host}`);
-      if (url.searchParams.get('t') !== tokenValue) {
-        sendJson(response, 403, { ok: false, error: 'bad token' });
-        return;
-      }
       const path = url.pathname;
+      // The page and its static assets are tokenless: the browser loads them
+      // with relative URLs (a <link>/<script> cannot carry the query string),
+      // and they contain no device data. Everything that can read the device or
+      // send input still requires the token.
       if (request.method === 'GET' && ASSETS.has(path)) {
         const [file, type] = ASSETS.get(path);
         const body = await readFile(join(HERE, file));
         response.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store', 'Content-Length': body.length });
         response.end(body);
+        return;
+      }
+      if (url.searchParams.get('t') !== tokenValue) {
+        sendJson(response, 403, { ok: false, error: 'bad token' });
         return;
       }
       if (request.method === 'GET' && path === '/stream') {

@@ -142,8 +142,11 @@ double-click / right-click / drag / scroll, keyboard (the picture keeps focus), 
 (Unicode goes through the Linkrd clipboard path), screenshot download, **断开**, and the agent's
 recent activity.
 
-- **Loopback only.** The server binds `127.0.0.1`, picks a random port and requires a random token
-  on every request (`?t=`). Do not paste that URL into a shared chat or expose it on a LAN.
+- **Loopback only.** The server binds `127.0.0.1` and picks a random port. The HTML page and its
+  static assets contain no device data and load without the token (the browser cannot put the query
+  string on `<link>`/`<script>`); every data/input endpoint (`/stream`, `/frame.jpg`, `/state.json`,
+  `/input.json`) requires the random `?t=` token. Do not paste the URL into a shared chat or expose
+  the port on a LAN.
 - The page and the agent share one device session; a person's click is noted in the same activity
   list. `linkr_panel { action: "close" }` stops the page (and plugin unload closes it too).
 - The panel starts the stream when it opens; closing the page leaves the session to the tools
