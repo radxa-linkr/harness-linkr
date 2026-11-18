@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Linkr screen">
+  <title>Linkr screen</title>
+  <!-- The host's monitor, outlined in the page's own ink colour. -->
+  <rect x="5" y="9" width="54" height="36" rx="5" fill="none" stroke="currentColor" stroke-width="3.4"/>
+  <!-- The screen the agent and the person both look at. -->
+  <rect x="11.5" y="15.5" width="41" height="23" rx="2.4" fill="#2f7fd6" opacity="0.18"/>
+  <!-- A pointer arrow on that screen: the panel acts on the real machine. -->
+  <path d="M24 20.5l7.4 17 2.4-6.6 6.7-2.3z" fill="#2f7fd6" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+  <!-- Live indicator. -->
+  <circle cx="46.5" cy="22" r="3.3" fill="#35b37e"/>
+  <!-- Stand. -->
+  <path d="M26 51h12" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M32 45v6" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M20 56h24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" opacity="0.55"/>
+</svg>

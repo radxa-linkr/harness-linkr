@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "linkr": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/absolute/path/to/harness-linkr/mcp-linkr/index.js"
+      ],
+      "env": {
+        "LINKR_BASE_URL": "http://linkr.local",
+        "LINKR_USERNAME": "admin",
+        "LINKR_PASSWORD": "the-device-password"
+      },
+      "enabled": true,
+      "description": "Linkr KVM computer use: capture and control a remote machine",
+      "timeout": 30000
+    }
+  }
+}

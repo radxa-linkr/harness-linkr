@@ -1,0 +1,40 @@
+# dsh-linkr bundle patch — mounts the Linkr KVM tools and the live screen panel.
+#
+# Settings feed the Host half (agent tools + panel routes). The panel reads them
+# back through GET /linkr/config and saves them through POST /linkr/config, which
+# writes this row's config via the Harness config editor.
+#
+#   baseUrl          device origin, no trailing slash (http://linkr.local or
+#                    http://linkr.local); the device serves plain HTTP on :80
+#   username         device account name (GET /api/account/info reports it)
+#   password         device account password; empty = use the `linkr/device`
+#                    credentials record instead (preferred: it never lands in a
+#                    config file)
+#   codec            auto | mjpeg | h264. auto = H.264 (decoded through ffmpeg)
+#                    when ffmpeg is available, else MJPEG. H.265 is not offered
+#                    over the device's WebSocket media transport: this firmware
+#                    only serves H.265 over WebRTC (see CONTRACT.md §7).
+#   ffmpegPath       ffmpeg executable; empty = $FFMPEG_PATH,
+#                    /opt/homebrew/bin/ffmpeg, then ffmpeg on PATH
+#   jpegQuality      ffmpeg -q:v for the H.264 path, 1 (best) .. 10 (smallest)
+#   manageVideoMode  true = switch the device to the codec's video mode while a
+#                    session is live and restore the previous value afterwards;
+#                    false = never write the device setting
+#   streamFps        frames per second handed to the panel / kept as latest (1-30)
+#   idleStopMs       stop the session (and restore the video mode) after this
+#                    long without a tool call or panel frame request
+#   screenshotDir    where linkr_screen writes JPEGs; empty = <session working dir>/.linkr
+- insert:
+    - id: linkr
+      name: 'dsh-linkr'
+      config:
+        baseUrl: 'http://linkr.local'
+        username: 'admin'
+        password: ''
+        codec: 'auto'
+        ffmpegPath: ''
+        jpegQuality: 4
+        manageVideoMode: true
+        streamFps: 20
+        idleStopMs: 120000
+        screenshotDir: ''

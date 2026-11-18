@@ -1,0 +1,21 @@
+{
+  "name": "linkr-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Linkr KVM transport: login, WHEP, MJPEG/H.264 media (ffmpeg), HID frames and the Linkrd clipboard. Source of truth for the materialized copies that ship inside dsh-linkr/ and the MCP bundle.",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./linkr": "./linkr.js",
+    "./client": "./client.js",
+    "./hid": "./hid.js",
+    "./media": "./media.js",
+    "./control": "./control.js",
+    "./ffmpeg": "./ffmpeg.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "GPL-3.0-only"
+}

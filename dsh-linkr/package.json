@@ -1,0 +1,68 @@
+{
+  "name": "dsh-linkr",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A Linkr KVM-over-IP device as a DeepSeek Harness plugin: the agent sees the controlled host's screen and injects mouse and keyboard, and a live screen panel in the right column lets a person watch and take over the same host.",
+  "type": "module",
+  "main": "./index.js",
+  "icon": "icon.svg",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./icon": "./icon.svg",
+    "./locale/*.json": "./locale/*.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "host",
+    "lib",
+    "client.js",
+    "cordis.patch.yml",
+    "locale",
+    "icon.svg",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "docs"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    },
+    "compatibility": {
+      "dsh": ">=0.2.0-rc.1 <0.3.0-0",
+      "dshReleases": {
+        "0.2.1-rc.5": "compatible"
+      }
+    }
+  },
+  "engines": {
+    "node": ">=22",
+    "dsh": ">=0.2.0-rc.1 <0.3.0-0"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "smoke": "node test/host-smoke.mjs",
+    "smoke:device": "LINKR_SMOKE=1 node --test test/smoke.mjs"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "dsh",
+    "linkr",
+    "kvm",
+    "kvm-over-ip",
+    "remote-control",
+    "screen",
+    "hid",
+    "mjpeg"
+  ],
+  "license": "GPL-3.0-only",
+  "author": {
+    "name": "Radxa"
+  }
+}

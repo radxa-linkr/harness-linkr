@@ -1,0 +1,26 @@
+# Per-package dependencies and build output
+**/node_modules/
+**/dist/
+**/build/
+**/*.log
+
+# Materialized transport copy: the source of truth is core/ (scripts/sync-core.mjs)
+dsh-linkr/lib/
+
+# Screenshots and artifacts written by a harness integration while a session's
+# working directory is this checkout
+**/.linkr/
+.linkr/
+
+# Harness/editor/OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Local environment
+.env
+.env.local
+
+# Local design-tooling scratch
+.impeccable/

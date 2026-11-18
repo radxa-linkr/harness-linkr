@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Linkr 电脑</title>
+    <style>
+      /* LINKR_STYLE */
+    </style>
+  </head>
+  <body>
+    <main>
+      <section id="viewer" aria-label="电脑">
+        <header class="bar">
+          <div class="row">
+            <h1>电脑</h1>
+            <span class="spacer"></span
+            ><button id="open-console" type="button" disabled>
+              打开 Linkr
+            </button>
+          </div>
+          <div class="row">
+            <span id="status-dot" class="dot"></span
+            ><strong id="connection" role="status">未连接</strong
+            ><span id="clipboard-status" role="status" hidden>
+              <span class="dot warn" aria-hidden="true"></span>剪贴板 不可用 </span
+            ><span class="spacer"></span
+            ><button id="start" type="button" class="primary" disabled>
+              连接</button
+            ><button id="stop" type="button" class="primary" hidden disabled>
+              断开
+            </button>
+          </div>
+          <div class="row controls">
+            <div class="metrics">
+              <span id="device-name">Linkr</span
+              ><span id="frame-info">尚无画面</span>
+            </div>
+            <div class="toolbar" aria-label="画面操作">
+              <button id="paste-toggle" type="button" disabled>粘贴</button
+              ><button
+                id="capture"
+                type="button"
+                title="刷新画面并保存截图"
+                disabled
+              >
+                刷新画面</button
+              ><button id="fit" type="button" aria-pressed="true">
+                适应宽度</button
+              ><button id="settings" type="button" disabled>设置</button>
+            </div>
+          </div>
+        </header>
+        <div
+          id="screen"
+          tabindex="0"
+          role="group"
+          aria-label="被控机画面，开启接管后可点击和拖动"
+        >
+          <div id="screen-state">
+            <strong id="screen-title">等待连接</strong>
+            <p id="screen-hint">在设置中登录 Linkr，即可查看被控机画面。</p>
+          </div>
+        </div>
+        <div class="caption">
+          <p>共享电脑的实时画面；设备登录与画面参数可在「设置」中修改。</p>
+          <div class="row">
+            <span>Agent 看到并操控的是同一块屏幕。</span
+            ><span class="spacer"></span><span id="transport"></span>
+          </div>
+        </div>
+        <section class="takeover" aria-label="人工接管">
+          <div class="row">
+            <label for="takeover"
+              ><input
+                id="takeover"
+                type="checkbox"
+                role="switch"
+                disabled
+              />人工接管</label
+            ><span class="spacer"></span><span id="control-state">只观看</span>
+          </div>
+          <p id="control-hint" class="note">
+            开启后可点击、拖动、滚动和输入，Agent 将暂停输入。
+          </p>
+        </section>
+        <section id="keyboard" aria-label="远程输入" hidden>
+          <div class="shortcuts">
+            <button data-key="return" type="button">Enter</button
+            ><button data-key="escape" type="button">Esc</button
+            ><button data-key="ctrl+alt+delete" type="button">
+              Ctrl + Alt + Delete
+            </button>
+          </div>
+          <form id="text-form">
+            <label for="text"
+              >快速粘贴
+              <span class="note">中文需要 Linkrd；英文可直接输入</span></label
+            >
+            <div class="row">
+              <input
+                id="text"
+                type="text"
+                autocomplete="off"
+                maxlength="4096"
+                placeholder="发送到被控机当前窗口"
+              /><button id="send-text" type="button">发送</button>
+            </div>
+          </form>
+        </section>
+        <p id="error" role="alert" hidden></p>
+        <p id="saved" role="status" hidden></p>
+        <section id="guide" class="guide" role="note">
+          <div class="row">
+            <h2>安装 Linkrd（可选）</h2>
+            <span class="spacer"></span
+            ><button id="dismiss-guide" type="button">不再提示</button>
+          </div>
+          <p>
+            装上后可直连中文粘贴、读回被控机剪贴板，并通过虚拟磁盘投文件；不装也能正常用画面和键鼠。
+          </p>
+          <ul>
+            <li>中文 / 多行文本一次粘贴</li>
+            <li>读回被控机剪贴板</li>
+            <li>虚拟磁盘投文件</li>
+          </ul>
+          <h3>被控机三步</h3>
+          <ol>
+            <li>设备控制台 → 插件中心，安装并启用 Linkrd</li>
+            <li>挂载 Linkrd.img</li>
+            <li>运行 Linkrd 并保持运行</li>
+          </ol>
+          <p class="note">普通窗口使用 Ctrl+V；终端窗口可使用 Ctrl+Shift+V。</p>
+          <button id="install-linkrd" type="button" class="primary" disabled>
+            打开 Linkr 安装
+          </button>
+        </section>
+        <section class="activity">
+          <h2>最近活动</h2>
+          <p id="activity-empty" class="note">连接设备后，活动会显示在这里。</p>
+          <ul id="activity-list" aria-label="最近活动"></ul>
+        </section>
+      </section>
+      <section id="settings-view" hidden aria-label="Linkr 登录与设置">
+        <header class="settings-head row">
+          <h1 id="settings-title">登录 Linkr</h1>
+          <span class="spacer"></span
+          ><button id="close-settings" type="button">关闭</button>
+        </header>
+        <form id="login-form" class="settings-form">
+          <label for="base-url"
+            >设备地址<input
+              id="base-url"
+              type="url"
+              required
+              maxlength="2048"
+              spellcheck="false"
+              autocomplete="url"
+              placeholder="http://linkr.local"
+          /></label>
+          <label for="username"
+            >用户名<input
+              id="username"
+              type="text"
+              required
+              maxlength="128"
+              spellcheck="false"
+              autocomplete="username"
+              placeholder="设备登录账号"
+          /></label>
+          <label for="password"
+            >密码<input
+              id="password"
+              type="password"
+              maxlength="4096"
+              autocomplete="current-password"
+              placeholder="请输入设备密码"
+            /><span id="password-note" class="note"
+              >密码仅保存在本机，不会回显。</span
+            ></label
+          >
+          <label for="codec"
+            >编码格式<select id="codec">
+              <option value="auto">自动：能解码就用 H.264</option>
+              <option value="mjpeg">MJPEG</option>
+              <option value="h264">H.264</option>
+            </select></label
+          >
+          <label for="fps"
+            >帧率<input
+              id="fps"
+              type="number"
+              min="1"
+              max="30"
+              step="1"
+              value="20"
+              required
+            /><span class="note">1–30，越大越流畅，也越占带宽。</span></label
+          >
+          <label for="jpeg-quality"
+            >JPEG 质量<input
+              id="jpeg-quality"
+              type="number"
+              min="1"
+              max="10"
+              step="1"
+              value="4"
+              required
+            /><span class="note"
+              >1–10，仅影响 H.264 解码后的图像；越小越清晰。</span
+            ></label
+          >
+          <label for="ffmpeg-path"
+            >ffmpeg 路径<input
+              id="ffmpeg-path"
+              type="text"
+              maxlength="4096"
+              spellcheck="false"
+              autocomplete="off"
+            /><span class="note">留空 = 自动查找</span></label
+          >
+          <div>
+            <button id="show-guide" type="button">Linkrd 安装指引</button>
+          </div>
+          <p id="settings-error" role="alert" hidden></p>
+          <div class="settings-foot">
+            <p class="note">校验登录后保存，并按新设置连接设备。</p>
+            <div class="row">
+              <button id="logout" type="button" class="danger" hidden>
+                退出登录</button
+              ><span class="spacer"></span
+              ><button
+                id="save-settings"
+                type="button"
+                class="primary"
+                disabled
+              >
+                登录并连接
+              </button>
+            </div>
+          </div>
+        </form>
+      </section>
+    </main>
+    <script>
+      /* LINKR_SCRIPT */
+    </script>
+  </body>
+</html>

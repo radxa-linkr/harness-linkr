@@ -1,0 +1,15 @@
+# Dependencies (the package itself has none; these appear if you install into it)
+node_modules/
+pnpm-lock.yaml
+
+# Screenshots and other artifacts written by linkr_computer_use while the
+# session working directory is this checkout
+.linkr/
+*.jpg.tmp
+
+# Editor / OS noise
+.DS_Store
+*.log
+
+# Materialized from ../core by scripts/sync-core.mjs (do not edit by hand)
+lib/

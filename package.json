@@ -1,0 +1,20 @@
+{
+  "name": "harness-linkr",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Linkr KVM-over-IP integrations for agent harnesses: one shared MCP server plus Codex, OpenCode, MiMoCode, MiniMaxCode and DeepSeek Harness adapters.",
+  "type": "module",
+  "scripts": {
+    "test": "node scripts/test-all.mjs",
+    "setup": "node scripts/setup.mjs",
+    "status": "node mcp-linkr/index.js --status",
+    "doctor": "node scripts/doctor.mjs",
+    "build:codex": "node scripts/build-codex-plugin.mjs",
+    "sync": "node scripts/sync-core.mjs",
+    "pack": "node scripts/pack-smoke.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "GPL-3.0-only"
+}

@@ -1,0 +1,25 @@
+# Linkr KVM computer use, as a local MCP stdio server for Codex.
+#
+# Where this goes: append to ~/.codex/config.toml (global; override the directory with CODEX_HOME).
+# Only the absolute path and the device values below need editing.
+
+[mcp_servers.linkr]
+command = "node"
+args = ["/absolute/path/to/harness-linkr/mcp-linkr/index.js"]
+# To forward the password from the shell, uncomment this here, and remove
+# LINKR_PASSWORD below. env_vars belongs to the server, not its env table.
+# env_vars = ["LINKR_PASSWORD"]
+
+[mcp_servers.linkr.env]
+LINKR_BASE_URL = "http://linkr.local"
+LINKR_USERNAME = "admin"
+LINKR_PASSWORD = "the-device-password"
+
+# Optional. Uncomment what you need:
+# LINKR_CODEC = "auto"            # auto | mjpeg | h264
+# LINKR_STREAM_FPS = "20"
+# LINKR_SAVE_DIR = "~/.linkr/captures"
+# LINKR_INLINE_IMAGES = "1"       # 1 = attach the JPEG inline, 0 = only report the saved path
+
+# Instead of LINKR_PASSWORD above, point at a file that contains it:
+# LINKR_PASSWORD_FILE = "~/.linkr/password"

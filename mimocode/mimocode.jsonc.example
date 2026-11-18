@@ -1,0 +1,32 @@
+// Linkr KVM computer use, as a local MCP stdio server for MiMoCode.
+//
+// Where this goes: ~/.config/mimocode/mimocode.jsonc (global; relocate with MIMOCODE_CONFIG_DIR) or
+// <project>/mimocode.jsonc (project). Merge the "mcp" object if the file already has one.
+// Only the absolute path and the device values below need editing.
+
+{
+  "$schema": "https://mimo.xiaomi.com/mimocode/config.json",
+  "mcp": {
+    "linkr": {
+      "type": "local",
+      "command": [
+        "node",
+        "/absolute/path/to/harness-linkr/mcp-linkr/index.js"
+      ],
+      "environment": {
+        "LINKR_BASE_URL": "http://linkr.local",
+        "LINKR_USERNAME": "admin",
+        "LINKR_PASSWORD": "the-device-password"
+
+        // Optional:
+        // "LINKR_CODEC": "auto",              // auto | mjpeg | h264
+        // "LINKR_STREAM_FPS": "20",
+        // "LINKR_SAVE_DIR": "~/.linkr/captures",
+        // "LINKR_INLINE_IMAGES": "1"          // 1 = inline JPEG, 0 = path only
+      },
+      "enabled": true
+
+      // "timeout": 30000                    // optional per-RPC timeout, ms
+    }
+  }
+}

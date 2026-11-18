@@ -1,0 +1,34 @@
+{
+  "name": "mcp-linkr",
+  "version": "0.3.1",
+  "private": true,
+  "description": "Linkr KVM computer-use tools as an MCP stdio server: screen capture and mouse/keyboard injection on the controlled host, shared by every agent harness.",
+  "type": "module",
+  "bin": {
+    "linkr-mcp": "./index.js"
+  },
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./tools": "./tools.js",
+    "./config": "./config.js"
+  },
+  "files": [
+    "index.js",
+    "tools.js",
+    "config.js",
+    "settings.js",
+    "device-mode.js",
+    "device-lease.js",
+    "panel.js",
+    "panel",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node test/mcp-smoke.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "GPL-3.0-only"
+}
