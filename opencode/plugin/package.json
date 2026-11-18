@@ -10,6 +10,8 @@
   },
   "files": [
     "index.js",
+    "panel-server.js",
+    "panel",
     "README.md",
     "LICENSE"
   ],

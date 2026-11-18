@@ -19,6 +19,7 @@ OpenCode launches the server as a local stdio MCP server; the server exposes `li
 | Process | OpenCode spawns `mcp-linkr/index.js` as a stdio MCP server | runs in-process inside OpenCode; no MCP |
 | Config | `mcp.servers.linkr` in `opencode.json` (2.x) | `plugins` entry pointing at `opencode/plugin` |
 | Tools | namespaced in the sandbox (`tools.linkr.linkr_status`) | first-class (`tools.linkr_status`) |
+| Panel | MCP Apps panel when the host supports one | `linkr_panel` → loopback web page (live screen + input) |
 | Shared with | Codex / MiMoCode / MiniMaxCode / DSH (same server) | this checkout only |
 
 Both are verified with **opencode 2.2.7**. Use the MCP adapter when one setup should serve every

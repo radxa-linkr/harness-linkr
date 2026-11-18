@@ -112,3 +112,21 @@ namespace. Captures default to `<project>/.linkr/captures/`; the model read the 
 described the screen ("KDE Plasma desktop … Konsole … pacman"). With the capture directory outside
 the project, the host refuses the file read (`external_directory`), so the plugin only file-references
 a capture that lies inside the session directory.
+
+
+## Native plugin panel (same day)
+
+`linkr_panel { action: "open" }` starts the plugin's loopback web panel. Verified against the real
+device by loading the same server module the plugin uses:
+
+```
+url    http://127.0.0.1:54554/?t=<token>
+page   200, html ok
+stream first frame 2.3 s after opening, 197,361 bytes, 1920x1080
+state  {"connected":true,"codec":"h264","width":1920,"height":1080,"subscribers":1}
+reply  stream closed cleanly, device mode restored by dispose()
+```
+
+The fetched frame was the controlled host's desktop (1920×1080 KDE session), i.e. the panel is not
+a mock: it serves the same session the tools drive. Input forwarding is covered by
+`scripts/opencode-panel-smoke.mjs` (click/key/paste go through `linkr_computer_use`).

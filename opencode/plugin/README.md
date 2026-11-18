@@ -8,6 +8,7 @@ MCP adapters use. Verified with **opencode 2.2.7**.
 | --- | --- |
 | `linkr_status` | Read-only device/session report: device name, firmware, model, serial, online state, codec, live frame size and fps, and the one-line fix when something is wrong. |
 | `linkr_computer_use` | One computer-use tool: `capture`, `click`, `double_click`, `right_click`, `drag`, `scroll`, `type`, `key`, `wait`, `paste`, `clipboard`, plus `capture_after` and `save`. Same schema and semantics as the MCP adapter. |
+| `linkr_panel` | Open/close the live **web panel**: a loopback page with the real-time screen (MJPEG), pointer/keyboard input, paste, screenshot and recent activity. `open` returns the URL. |
 
 OpenCode 2 runs tools in its code sandbox, so the model calls them as
 `tools.linkr_status()` / `tools.linkr_computer_use({...})` inside `execute`, or as normal
@@ -95,6 +96,29 @@ Expected: the model calls `tools.linkr_status()` / `tools.linkr_computer_use({ac
 and answers with the device name and frame size; the capture JPEG is under `.linkr/captures/`
 and the model can describe the screen from it.
 
+## Live panel
+
+The agent can open the panel:
+
+> Open the Linkr panel.
+
+which calls `linkr_panel { action: "open" }` and returns a URL like
+`http://127.0.0.1:54321/?t=<token>`. Open it in any local browser: the page shows the same
+session the tools drive, with the controls a person needs — full-width live picture, click /
+double-click / right-click / drag / scroll, keyboard (the picture keeps focus), paste box
+(Unicode goes through the Linkrd clipboard path), screenshot download, **断开**, and the agent's
+recent activity.
+
+- **Loopback only.** The server binds `127.0.0.1`, picks a random port and requires a random token
+  on every request (`?t=`). Do not paste that URL into a shared chat or expose it on a LAN.
+- The page and the agent share one device session; a person's click is noted in the same activity
+  list. `linkr_panel { action: "close" }` stops the page (and plugin unload closes it too).
+- The panel starts the stream when it opens; closing the page leaves the session to the tools
+  (and the device's idle-stop).
+- This is a **browser page**, not an in-app OpenCode TUI/desktop part: those need the separate
+  `@opencode/plugin/tui` / `gui` APIs and a Solid/OpenTUI build. The page works in any browser and
+  can be embedded later if an in-app panel is wanted.
+
 ## Notes
 
 - The plugin loads lazily: no device connection, session or ffmpeg until the first tool call.
@@ -102,5 +126,5 @@ and the model can describe the screen from it.
   integration cannot stomp a session held by the other.
 - This is the **repository-local build**: `index.js` imports `../../mcp-linkr/`. A published npm
   package would bundle that runtime (and the materialized transport) first.
-- No TUI/desktop panel yet (the DSH plugin and the Codex plugin have one); only the tools.
+- The live panel is the loopback web page above; an in-app TUI/desktop part is not included yet.
 - GPL-3.0-only, like the rest of the repository.

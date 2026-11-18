@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Linkr 共享电脑</title>
+<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+<main class="card">
+  <header class="head">
+    <div class="title-row">
+      <span class="dot" id="status-dot" aria-hidden="true"></span>
+      <h1>Linkr 共享电脑</h1>
+      <span class="spacer"></span>
+      <button id="capture" class="btn" title="下载当前画面">截图</button>
+      <button id="refresh" class="btn" title="重新开始实时画面">刷新画面</button>
+      <button id="fit" class="btn btn-on" title="适应当前窗口宽度" aria-pressed="true">适应宽度</button>
+      <button id="paste" class="btn" title="向被控机粘贴文本">粘贴</button>
+      <button id="disconnect" class="btn" title="断开并恢复设备视频模式">断开</button>
+    </div>
+    <div class="row status-row">
+      <span id="status" class="status">正在连接…</span>
+      <span class="spacer"></span>
+      <span id="metrics" class="metric">—</span>
+    </div>
+  </header>
+
+  <section id="paste-box" class="paste-box" hidden>
+    <textarea id="paste-text" rows="3" placeholder="要发送到被控机的文本（中文/长文本走剪贴板，需要被控机安装 Linkrd）"></textarea>
+    <div class="paste-actions">
+      <button id="paste-send" class="btn btn-primary">发送</button>
+      <button id="paste-close" class="btn">关闭</button>
+    </div>
+  </section>
+
+  <section id="stage" class="stage" tabindex="0" aria-label="被控机实时画面">
+    <img id="frame" alt="被控机实时画面" draggable="false" hidden>
+    <p id="hint" class="hint">连接后显示实时画面。点击画面后可直接使用键盘。</p>
+  </section>
+
+  <section class="activity">
+    <h2>最近活动</h2>
+    <ul id="activity-list"></ul>
+  </section>
+
+  <p id="toast" class="toast" role="status" hidden></p>
+</main>
+<script src="panel.js"></script>
+</body>
+</html>

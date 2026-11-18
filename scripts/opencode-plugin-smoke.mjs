@@ -44,9 +44,9 @@ check('the package exports a Plugin with the expected id', () => {
   if (plugin.default?.id !== 'opencode-linkr') throw new Error('Plugin.define id mismatch');
 });
 
-check('both Linkr tools are registered', () => {
+check('all Linkr tools are registered (including the panel)', () => {
   const ids = [...(plugin.TOOL_IDS ?? [])].sort();
-  const expected = ['linkr_computer_use', 'linkr_status'];
+  const expected = ['linkr_computer_use', 'linkr_panel', 'linkr_status'];
   if (JSON.stringify(ids) !== JSON.stringify(expected)) throw new Error(`TOOL_IDS is ${JSON.stringify(ids)}`);
 });
 
@@ -74,7 +74,7 @@ check('a capture inside the project becomes a file block, outside it does not', 
 
 check('nativeTools maps a callTool result and surfaces failures', async () => {
   const ok = plugin.nativeTools({ callTool: async (name) => ({ content: [{ type: 'text', text: name }], value: {} }) });
-  if (ok.length !== 2) throw new Error(`expected 2 tools, got ${ok.length}`);
+  if (ok.length !== 2) throw new Error(`expected 2 native tools, got ${ok.length}`);
   const status = await ok.find((tool) => tool.name === 'linkr_status').execute({}, {});
   if (status.content[0].text !== 'linkr_status') throw new Error('the status tool did not forward the call');
   const failing = plugin.nativeTools({ callTool: async () => ({ content: [{ type: 'text', text: 'device is not reachable' }], isError: true }) });

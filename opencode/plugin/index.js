@@ -23,11 +23,12 @@ import { Plugin } from '@opencode/plugin';
 
 import { readConfig } from '../../mcp-linkr/config.js';
 import { createLinkrTools, TOOLS } from '../../mcp-linkr/tools.js';
+import { createPanelServer } from './panel-server.js';
 
 export const id = 'opencode-linkr';
 
 /** The tool names this plugin registers (`ctx.tool.list()` ids). */
-export const TOOL_IDS = Object.freeze(['linkr_status', 'linkr_computer_use']);
+export const TOOL_IDS = Object.freeze(['linkr_status', 'linkr_computer_use', 'linkr_panel']);
 
 /** `options` keys that map 1:1 onto the MCP adapter's environment variables. */
 const ENV_BY_OPTION = {
@@ -91,6 +92,25 @@ export function toContent(result, { projectDir = '' } = {}) {
   return content;
 }
 
+/** The panel tool is plugin-specific (the MCP adapter has its own panel tool). */
+const PANEL_TOOL = {
+  name: 'linkr_panel',
+  description:
+    'Open or close the Linkr live screen panel. "open" starts a local, token-gated page on 127.0.0.1 ' +
+    'and returns its URL; the page shows the same session these tools drive (live MJPEG, pointer and ' +
+    'keyboard input, paste, recent activity) so a person can watch and take over. "state" reports the ' +
+    'running panel URL. "close" stops the page. The panel is loopback-only and cannot be reached from ' +
+    'the network.',
+  input: {
+    type: 'object',
+    properties: {
+      action: { type: 'string', enum: ['open', 'state', 'close'], description: 'open | state | close' },
+    },
+    required: ['action'],
+    additionalProperties: false,
+  },
+};
+
 /** Plain `{ name, description, input, execute }` infos for `editor.add()`. */
 export function nativeTools(tools, { projectDir = '' } = {}) {
   const definitions = TOOLS.filter((tool) => TOOL_IDS.includes(tool.name));
@@ -125,10 +145,46 @@ export default Plugin.define({
       config.saveDir = join(projectDir, '.linkr', 'captures');
     }
     const tools = createLinkrTools(config);
+    const panelFps = Math.max(2, Math.min(15, Number(config.client.fps) || 10));
+    let panel = null;
+    const panelTool = {
+      ...PANEL_TOOL,
+      execute: async (args = {}) => {
+        const action = typeof args.action === 'string' ? args.action.trim().toLowerCase() : '';
+        if (action === 'open') {
+          if (panel === null) panel = await createPanelServer({ tools, fps: panelFps });
+          return {
+            content: [
+              { type: 'text', text: `Linkr 面板已启动：${panel.url}\n在浏览器打开即可观看和操作；面板与 agent 共用同一个设备会话。` },
+            ],
+            metadata: { url: panel.url },
+          };
+        }
+        if (action === 'state') {
+          return {
+            content: [{ type: 'text', text: panel === null ? 'Linkr 面板未启动；用 action "open" 启动。' : `Linkr 面板：${panel.url}` }],
+            metadata: panel === null ? {} : { url: panel.url },
+          };
+        }
+        if (action === 'close') {
+          if (panel !== null) {
+            await panel.close();
+            panel = null;
+          }
+          return { content: [{ type: 'text', text: 'Linkr 面板已关闭。' }] };
+        }
+        throw new Error('action must be "open", "state" or "close"');
+      },
+    };
     await ctx.tool.transform((editor) => {
       for (const tool of nativeTools(tools, { projectDir })) editor.add(tool);
+      editor.add(panelTool);
     });
     return async () => {
+      if (panel !== null) {
+        await panel.close();
+        panel = null;
+      }
       await tools.dispose();
     };
   },
