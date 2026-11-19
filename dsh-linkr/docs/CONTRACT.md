@@ -788,3 +788,9 @@ editor before the error is returned. A store failure that also resists the
 rollback reports that the other settings were saved. Covered by host-smoke
 ("a failed password store rolls the saved row back", "a failed profile write
 never touches the password store").
+
+`LinkrClient.dispose()` is idempotent: concurrent or repeated calls share one
+teardown, report the session end at most once (and not at all when there was no
+session and no mode debt), and retry a video-mode restore that failed earlier.
+`session-end.test.mjs` covers dispose idempotency, disconnect-after-dispose, and
+an idle stop whose restore fails before a later dispose heals it.

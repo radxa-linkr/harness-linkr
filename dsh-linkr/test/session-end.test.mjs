@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 
 const scratch = mkdtempSync(join(tmpdir(), 'linkr-session-end-'));
 process.env.LINKR_STATE_DIR = scratch;
@@ -30,18 +31,22 @@ async function check(name, fn) {
 const fake = createFakeDevice({ username: 'tester', password: 's3cret', initialCodec: 0 });
 await fake.listen();
 const ends = [];
-const client = new LinkrClient({
-  baseUrl: fake.origin,
-  username: 'tester',
-  password: 's3cret',
-  codec: 'mjpeg',
-  manageVideoMode: true,
-  fps: 5,
-  beforeVideoModeChange: ({ origin, priorMode, targetMode }) =>
-    writeJournal({ pid: process.pid, origin, baselineMode: priorMode, mode: targetMode, at: Date.now() }),
-  afterVideoModeRestore: ({ origin }) => clearJournal({ pid: process.pid, force: false, origin }),
-  onSessionEnd: ({ reason, restored }) => ends.push({ reason, restored }),
-});
+function makeClient(extra = {}) {
+  return new LinkrClient({
+    baseUrl: fake.origin,
+    username: 'tester',
+    password: 's3cret',
+    codec: 'mjpeg',
+    manageVideoMode: true,
+    fps: 5,
+    beforeVideoModeChange: ({ origin, priorMode, targetMode }) =>
+      writeJournal({ pid: process.pid, origin, baselineMode: priorMode, mode: targetMode, at: Date.now() }),
+    afterVideoModeRestore: ({ origin }) => clearJournal({ pid: process.pid, force: false, origin }),
+    onSessionEnd: ({ reason, restored }) => ends.push({ reason, restored }),
+    ...extra,
+  });
+}
+const client = makeClient();
 
 try {
   await check('a successful restore reports restored:true', async () => {
@@ -68,6 +73,35 @@ try {
     assert.deepEqual(ends.at(-1), { reason: 'disconnect', restored: true });
     assert.equal(fake.codec, 0);
     assert.equal(client.state.modeOwned, false);
+  });
+
+  await check('dispose is idempotent and reports the session end once', async () => {
+    const second = makeClient();
+    await second.connect();
+    assert.equal(fake.codec, 1);
+    const before = ends.length;
+    await Promise.all([second.dispose(), second.dispose()]);
+    assert.equal(ends.length, before + 1, 'two disposes must not report two session ends');
+    assert.deepEqual(ends.at(-1), { reason: 'disconnect', restored: true });
+    assert.equal(fake.codec, 0);
+    await second.disconnect();
+    assert.equal(ends.length, before + 1, 'disconnect after dispose is a no-op');
+    assert.equal(fake.codec, 0);
+  });
+
+  await check('an idle stop that cannot restore keeps the debt until dispose retries', async () => {
+    const third = makeClient({ idleStopMs: 150 });
+    await third.connect();
+    assert.equal(fake.codec, 1);
+    fake.codecWriteFails = true;
+    await sleep(500);
+    fake.codecWriteFails = false;
+    assert.deepEqual(ends.at(-1), { reason: 'disconnect', restored: false });
+    assert.equal(fake.codec, 1, 'the idle stop could not restore the mode');
+    assert.equal(third.state.modeOwned, true);
+    await third.dispose();
+    assert.deepEqual(ends.at(-1), { reason: 'disconnect', restored: true });
+    assert.equal(fake.codec, 0);
   });
 } finally {
   await client.dispose().catch(() => {});

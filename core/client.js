@@ -154,6 +154,7 @@ export class LinkrClient {
   #priorMode = null;
   #modeOwned = false;
   #restoring = null;
+  #disposePromise = null;
   #error = '';
   #disposed = false;
   #stoppingSession = false;
@@ -522,21 +523,25 @@ export class LinkrClient {
     return this.state;
   }
 
-  /** Stop everything and give the device its video mode back. */
+  /** Stop everything and give the device its video mode back. Idempotent. */
   async dispose() {
-    this.#disposed = true;
-    this.#clearIdle();
-    await this.#starting?.catch(() => {});
-    await this.#teardown();
-    if (this.#device) {
-      try {
-        this.#device.dispose();
-      } catch {
-        // nothing to release
+    if (this.#disposePromise) return this.#disposePromise;
+    this.#disposePromise = (async () => {
+      this.#disposed = true;
+      this.#clearIdle();
+      await this.#starting?.catch(() => {});
+      await this.#teardown();
+      if (this.#device) {
+        try {
+          this.#device.dispose();
+        } catch {
+          // nothing to release
+        }
       }
-    }
-    this.#frameListeners.clear();
-    return this.state;
+      this.#frameListeners.clear();
+      return this.state;
+    })();
+    return this.#disposePromise;
   }
 
   /* ------------------------------------------------------------------ internals */
@@ -776,6 +781,7 @@ export class LinkrClient {
   async #teardown() {
     this.#clearIdle();
     this.#dropClipboard();
+    const hadSession = this.#session !== null || this.#modeOwned;
     const session = this.#session;
     this.#session = null;
     this.#activeCodec = null;
@@ -791,7 +797,9 @@ export class LinkrClient {
     await this.#restoreVideoMode();
     // No debt left (modeOwned false) is the only state in which another app may
     // take the device; a failed restore keeps the lease and the retry path.
-    await this.#notifySessionEnd('disconnect', this.#modeOwned === false);
+    // Nothing to report when there was no session and no debt (a second dispose
+    // or a disconnect after dispose must not look like another session end).
+    if (hadSession) await this.#notifySessionEnd('disconnect', this.#modeOwned === false);
   }
 
   #onSessionClosed(reason) {
