@@ -205,7 +205,7 @@ function makeCtx(options = {}) {
   const tools = new Map();
   const routes = [];
   const cleanups = [];
-  const events = { edited: [], records: [], images: [] };
+  const events = { edited: [], records: [], images: [], credentialsFail: false, editorFail: false };
   const credentials =
     options.credentials === false
       ? undefined
@@ -215,6 +215,7 @@ function makeCtx(options = {}) {
             return options.storedRecord === undefined ? undefined : { kind: 'grant', payload: { password: options.storedRecord } };
           },
           async modifyRecord(key, mutate) {
+            if (events.credentialsFail) throw new Error('credential store unavailable');
             const next = await mutate(undefined);
             events.records.push({ op: 'write', key, value: next });
             return next;
@@ -254,6 +255,7 @@ function makeCtx(options = {}) {
       ? undefined
       : {
           async edit(entry, change) {
+            if (events.editorFail) throw new Error('profile is read-only');
             const current = { ...(options.currentConfig ?? {}) };
             const next = change(current);
             events.edited.push({ entry, next });
@@ -1181,6 +1183,43 @@ async function main() {
       const empty = await httpJson(site, '/linkr/config', { method: 'POST', body: { password: '\u2022\u2022\u2022\u2022\u2022\u2022' } });
       assert.equal(empty.status, 400, 'a masked password alone is not a change');
       return `applied=profile, configEditor edit carried baseUrl/username/streamFps, no password key`;
+    });
+
+    await check('a failed password store rolls the saved row back', async () => {
+      const before = await httpJson(site, '/linkr/config');
+      assert.equal(before.status, 200, before.text);
+      const beforeUser = before.json.config.username;
+      const edits = ctx.__events.edited.length;
+      ctx.__events.credentialsFail = true;
+      const answer = await httpJson(site, '/linkr/config', {
+        method: 'POST',
+        body: { username: 'rollback-user', password: 'rolled-back-password' },
+      });
+      ctx.__events.credentialsFail = false;
+      assert.equal(answer.status, 400, answer.text);
+      assert.match(answer.json.error, /password was not stored/);
+      assert.ok(ctx.__events.edited.length >= edits + 2, 'the row write and its rollback both edit the profile');
+      assert.equal(ctx.__events.edited.at(-1).next.username, beforeUser, 'the rollback restored the previous username');
+      const after = await httpJson(site, '/linkr/config');
+      assert.equal(after.json.config.username, beforeUser);
+      return 'row first, credential failure rolls the row back';
+    });
+
+    await check('a failed profile write never touches the password store', async () => {
+      const writes = () => ctx.__events.records.filter((entry) => entry.op === 'write').length;
+      const before = writes();
+      ctx.__events.editorFail = true;
+      const answer = await httpJson(site, '/linkr/config', {
+        method: 'POST',
+        body: { username: 'editor-failed-user', password: 'never-stored-password' },
+      });
+      ctx.__events.editorFail = false;
+      assert.equal(answer.status, 400, answer.text);
+      assert.match(answer.json.error, /settings were not saved/);
+      assert.equal(writes(), before, 'no credential write after a failed profile write');
+      const after = await httpJson(site, '/linkr/config');
+      assert.notEqual(after.json.config.username, 'editor-failed-user');
+      return 'editor failure aborts before any credential write';
     });
 
     await check('POST /linkr/config password → credentials record, not config', async () => {

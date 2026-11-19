@@ -258,35 +258,56 @@ export function registerRoutes(ctx, deps) {
     const next = normalizeConfig({ ...deps.config, ...patch }, issues);
     if (issues.length > 0) return { ok: false, error: issues.map((issue) => issue.message).join('; ') };
 
-    if (password !== undefined && canStorePassword) {
+    // Persist what normalization produced, not what the form sent: the stored
+    // row is then exactly what this run reads back (trailing slashes dropped,
+    // numbers clamped into range).
+    const durable = {};
+    for (const key of Object.keys(patch)) durable[key] = next[key];
+    const previousDurable = {};
+    for (const key of Object.keys(durable)) previousDurable[key] = deps.config[key];
+    const editor = ctx.get?.('configEditor');
+    const entry = ctx.fiber?.entry;
+    const canEdit = editor !== undefined && typeof editor.edit === 'function' && entry !== undefined;
+    const writesRow = Object.keys(durable).length > 0 && canEdit;
+    let rowSaved = false;
+    let passwordStored = false;
+
+    // The row is the durable home of the non-secret settings; write it first so
+    // a failed editor leaves everything (including the password) untouched.
+    if (writesRow) {
       try {
-        await credentials.modifyRecord(CREDENTIAL_KEY, async () => ({ kind: 'grant', payload: { password } }));
+        await editor.edit(entry, (current) => ({ ...(current ?? {}), ...durable }));
+        rowSaved = true;
       } catch (error) {
-        return { ok: false, error: `the password was not stored: ${sentence(error)}` };
+        return { ok: false, error: `the settings were not saved: ${sentence(error)}` };
       }
     }
 
-    let applied = password !== undefined && canStorePassword ? 'credentials' : 'memory';
-    if (Object.keys(patch).length > 0) {
-      // Persist what normalization produced, not what the form sent: the stored
-      // row is then exactly what this run reads back (trailing slashes dropped,
-      // numbers clamped into range).
-      const durable = {};
-      for (const key of Object.keys(patch)) durable[key] = next[key];
-      // The profile patch is the durable home, so the write goes through the
-      // shell's config editor when it exists. A shell without that service still
-      // lets the change apply for this run.
-      const editor = ctx.get?.('configEditor');
-      const entry = ctx.fiber?.entry;
-      if (editor !== undefined && typeof editor.edit === 'function' && entry !== undefined) {
-        try {
-          await editor.edit(entry, (current) => ({ ...(current ?? {}), ...durable }));
-          applied = 'profile';
-        } catch (error) {
-          return { ok: false, error: `the settings were not saved: ${sentence(error)}` };
+    if (password !== undefined && canStorePassword) {
+      try {
+        await credentials.modifyRecord(CREDENTIAL_KEY, async () => ({ kind: 'grant', payload: { password } }));
+        passwordStored = true;
+      } catch (error) {
+        // A password write that failed after the row was saved would leave half
+        // a settings change; put the previous row values back when possible.
+        if (rowSaved) {
+          try {
+            await editor.edit(entry, (current) => ({ ...(current ?? {}), ...previousDurable }));
+            rowSaved = false;
+          } catch {
+            /* report the failed rollback instead of hiding it */
+          }
         }
+        return {
+          ok: false,
+          error: rowSaved
+            ? `the password was not stored (${sentence(error)}); the other settings were saved`
+            : `the password was not stored: ${sentence(error)}`,
+        };
       }
     }
+
+    const applied = rowSaved ? 'profile' : passwordStored ? 'credentials' : 'memory';
 
     Object.assign(deps.config, next);
     // A settings write is an explicit request to make the device work again.

@@ -778,3 +778,13 @@ an apply, allowing the same pid (Cordis reloads the plugin in place) and skippin
 `manageVideoMode` is false. `core/recover.js` refuses a journal whose owner pid is alive, verifies
 the device reports the restored mode, and clears the record; a dead-owner record without a finite
 baseline is discarded. `dsh-linkr/test/recovery.test.mjs` covers the hook and the same-pid repair.
+
+Settings writes are ordered so a failure cannot leave half a change: the row
+(`baseUrl`/account/codec/pace/…) is saved through `configEditor` first, then the
+password is stored in the credentials record. If the profile write fails, no
+credential write happens; if the credential write fails after the row was
+saved, the previous values of the changed keys are written back through the
+editor before the error is returned. A store failure that also resists the
+rollback reports that the other settings were saved. Covered by host-smoke
+("a failed password store rolls the saved row back", "a failed profile write
+never touches the password store").
