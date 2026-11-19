@@ -38,3 +38,21 @@ adapter README documents it).
 - **MiniMaxCode**: `npm i -g @minimax-ai/code`, log in, then `mcode run …` from a project whose
   `.mcp.json` (or user-level `mcp.json`) was written by
   `node scripts/setup.mjs --harness minimaxcode --username <account>`.
+
+
+## Kill-mid-session recovery (2026-11-19, fake device)
+
+`node scripts/recovery-e2e.mjs` starts a local fake device plus an MCP server, captures once
+(switching the fake's codec 0 → 1 and writing `~/.linkr/mcp-session-<origin>.json` with baseline 0),
+SIGKILLs the server, then runs `mcp-linkr/index.js --restore-mode`:
+
+```
+baseline codec: 0
+after capture codec: 1 | journal: 0
+after SIGKILL codec: 1 | journal exists: true
+restore exit: 0 | stdout: {"recovered":true,"mode":0}
+after recovery codec: 0 | journal exists: false
+```
+
+The same journal/restore path is used by the DSH plugin (`dsh-linkr/test/recovery.test.mjs` covers
+its hooks and the in-process reload case). The suite runs in `node scripts/test-all.mjs`.

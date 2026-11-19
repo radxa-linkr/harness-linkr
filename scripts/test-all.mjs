@@ -16,6 +16,7 @@ const SUITES = [
   { name: 'dsh-linkr host smoke', cwd: join(ROOT, 'dsh-linkr'), command: process.execPath, args: ['test/host-smoke.mjs'] },
   { name: 'mcp-linkr journal unit', cwd: join(ROOT, 'mcp-linkr'), command: process.execPath, args: ['test/device-mode.test.mjs'] },
   { name: 'mcp-linkr stdio smoke', cwd: join(ROOT, 'mcp-linkr'), command: process.execPath, args: ['test/mcp-smoke.mjs'] },
+  { name: 'kill-mid-session recovery E2E', cwd: ROOT, command: process.execPath, args: ['scripts/recovery-e2e.mjs'] },
   { name: 'MCP session safety and live panel', cwd: ROOT, command: process.execPath, args: ['--test', 'mcp-linkr/test/session-safety.test.mjs'] },
   { name: 'Private plugin login and device switching', cwd: ROOT, command: process.execPath, args: ['--test', 'mcp-linkr/test/settings.test.mjs'] },
   { name: 'Codex policy preservation', cwd: ROOT, command: process.execPath, args: ['--test', 'scripts/codex-config.test.mjs'] },
