@@ -73,9 +73,11 @@ check('settings validate, persist and merge', async () => {
     if (read.baseUrl !== 'http://linkr.test' || read.codec !== 'h264') throw new Error(`read back ${JSON.stringify(read)}`);
     const clean = settingsModule.validatePatch({ baseUrl: 'http://linkr.test:8080/' });
     if (clean.baseUrl !== 'http://linkr.test:8080') throw new Error(`baseUrl normalised to ${clean.baseUrl}`);
-    let threw = false;
-    try { settingsModule.validatePatch({ baseUrl: 'http://linkr.test/path' }); } catch { threw = true; }
-    if (!threw) throw new Error('a baseUrl with a path must be rejected');
+    for (const bad of ['http://linkr.test/path', 'http://linkr.test/?a=1', 'http://linkr.test/#x']) {
+      let threw = false;
+      try { settingsModule.validatePatch({ baseUrl: bad }); } catch { threw = true; }
+      if (!threw) throw new Error(`baseUrl ${bad} must be rejected`);
+    }
     const view = settingsModule.publicSettings({ client: { baseUrl: 'http://a', username: 'u', codec: 'auto', password: 'x' } }, {});
     if (!view.hasPassword || view.passwordSource !== 'environment') throw new Error(`publicSettings ${JSON.stringify(view)}`);
   } finally {

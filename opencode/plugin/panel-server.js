@@ -127,6 +127,9 @@ export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, f
     // stream open before the first frame exists.
     response.flushHeaders?.();
     subscribers.add(response);
+    // A new viewer starts a new session: do not replay the last frame of a
+    // previous one while the device connects.
+    if (subscribers.size === 1) lastFrame = null;
     try {
       await ensureSession();
     } catch (error) {

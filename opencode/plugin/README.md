@@ -116,7 +116,8 @@ right-column panel.
 - **设置** (in the panel header) edits the connection in place: device address, account, password
   (blank keeps the saved one) and codec. Saving writes `~/.linkr/opencode-plugin.json` (0600, over
   the `opencode.json` options and `LINKR_*` environment), rebuilds the device tools and reloads the
-  panel. It never touches `opencode.json`.
+  panel. It never touches `opencode.json`. The file is `0600`; the password is only present if it was
+  typed into the form (a `passwordFile`/environment password is left where it is).
 - The tab opens in the session's side region (560 px) and renders the loopback page in an iframe
   (`&embed=1`, so the page drops its outer chrome); **刷新** reloads it and **在浏览器打开** opens the
   standalone page.
@@ -165,6 +166,10 @@ recent activity.
 
 ## Notes
 
+- One Linkr session per machine: the device lease is shared with the DSH plugin and the MCP adapter.
+  If another local panel (e.g. the DSH 「电脑」 tab) is streaming the same device, the Linkr panel
+  starts but the page shows the lease sentence instead of a picture — disconnect the other session
+  first. The error is surfaced verbatim in the panel's stage hint and `/state.json`.
 - The plugin loads lazily: no device connection, session or ffmpeg until the first tool call.
 - It shares the same on-disk device lease/journal as the MCP adapter, so an agent using one
   integration cannot stomp a session held by the other.

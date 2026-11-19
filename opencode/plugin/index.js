@@ -48,10 +48,6 @@ const ENV_BY_OPTION = {
 };
 
 /**
- * Build the same config object the MCP server uses, with plugin options taking
- * precedence over the environment.
- */
-/**
  * The project directory this plugin was loaded for, when the host reports it.
  * Captures default to `<project>/.linkr/captures` so the model can read the
  * image without an external-directory permission prompt.
@@ -61,6 +57,10 @@ export function projectDirectory(location) {
   return typeof directory === 'string' && directory !== '' ? directory : '';
 }
 
+/**
+ * The same config object the MCP server uses: plugin options first, then the
+ * environment, then the saved settings file (merged by setup).
+ */
 export function configFromOptions(options = {}, env = process.env) {
   const merged = { ...env };
   for (const [option, variable] of Object.entries(ENV_BY_OPTION)) {
@@ -113,9 +113,12 @@ const PANEL_TOOL = {
   },
 };
 
+/** The MCP tool names this plugin re-exports (the panel tool is plugin-local). */
+const NATIVE_TOOL_IDS = Object.freeze(['linkr_status', 'linkr_computer_use']);
+
 /** Plain `{ name, description, input, execute }` infos for `editor.add()`. */
 export function nativeTools(tools, { projectDir = '' } = {}) {
-  const definitions = TOOLS.filter((tool) => TOOL_IDS.includes(tool.name));
+  const definitions = TOOLS.filter((tool) => NATIVE_TOOL_IDS.includes(tool.name));
   return definitions.map((definition) => ({
     name: definition.name,
     description: definition.description,

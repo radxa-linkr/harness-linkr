@@ -16,7 +16,7 @@
  * password (blank keeps the current one) and codec. Saving writes the plugin's
  * settings file and rebuilds the device tools, returning a new panel URL.
  */
-import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } from 'solid-js';
 
 import { usePlugin } from '@opencode/plugin/gui';
 
@@ -113,22 +113,27 @@ export function ScreenPanel() {
     });
   });
 
-  // Follow a live appearance change without re-requesting the URL.
-  createEffect(() => {
-    mode();
-    if (rawUrl() !== '') setNonce((value) => value + 1);
-  });
+  // Follow a live appearance change without re-requesting the URL. `on` keeps
+  // the effect off the rawUrl dependency, so starting the panel does not reload
+  // the iframe twice.
+  createEffect(
+    on(
+      mode,
+      (value, previous) => {
+        if (previous !== undefined && rawUrl() !== '') setNonce((current) => current + 1);
+      },
+      { defer: true },
+    ),
+  );
 
   return (
     <div class={`linkr-gui ${mode()}`}>
       <header>
         <span class="name">{ctx.t('title')}</span>
         <span class="spacer" />
-        <Show when={rawUrl() !== '' || editing()}>
-          <button type="button" onClick={() => void openSettings()} disabled={busy()}>
-            {ctx.t('panel.settings')}
-          </button>
-        </Show>
+        <button type="button" onClick={() => void openSettings()} disabled={busy()}>
+          {ctx.t('panel.settings')}
+        </button>
         <button type="button" onClick={() => void start()} disabled={busy()}>
           {ctx.t('panel.refresh')}
         </button>

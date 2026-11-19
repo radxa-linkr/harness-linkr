@@ -76,6 +76,7 @@ export function validatePatch(patch) {
     }
     if (!['http:', 'https:'].includes(url.protocol)) throw new Error('设备地址必须是 http:// 或 https://');
     if (url.pathname !== '/' && url.pathname !== '') throw new Error('设备地址只写到主机和端口，不要带路径');
+    if (url.search !== '' || url.hash !== '') throw new Error('设备地址不要带查询参数或锚点');
     out.baseUrl = url.origin;
   }
   if (out.username !== undefined && out.username === '') throw new Error('账号不能为空');

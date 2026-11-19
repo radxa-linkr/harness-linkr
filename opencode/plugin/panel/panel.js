@@ -289,6 +289,7 @@
       const state = payload.state || {};
       if (typeof payload.error === 'string' && payload.error !== '') {
         setStatus('err', '连接失败');
+        metrics.textContent = '—';
         hint.hidden = false;
         hint.textContent = payload.error;
         return;
