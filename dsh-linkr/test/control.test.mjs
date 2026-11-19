@@ -460,3 +460,21 @@ test('revisionOf keeps uint64 revisions out of JS numbers', () => {
   assert.equal(revisionOf('12abc'), '');
   assert.equal(revisionOf(-1n), '');
 });
+
+
+test('a second clipboard request while one is in flight is refused', async () => {
+  resetFakes();
+  let deliveries = 0;
+  FakeControlSocket.device = (socket) => {
+    deliveries += 1;
+    setTimeout(() => socket.deliver(statusFrame()), 10);
+  };
+  const ch = channel();
+  const first = ch.status();
+  const second = ch.status();
+  await assert.rejects(second, /still in flight/);
+  const status = await first;
+  assert.equal(status.maxBytes, 4096);
+  assert.equal(deliveries, 1, 'only one request frame reached the device');
+  await ch.close();
+});

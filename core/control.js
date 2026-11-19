@@ -421,6 +421,7 @@ export class ClipboardChannel {
   #socket = null;
   #opening = null;
   #pending = null;
+  #requesting = false;
   #idleTimer = null;
   #closed = false;
 
@@ -528,47 +529,55 @@ export class ClipboardChannel {
     if (this.#closed) {
       throw new LinkrError('clipboard channel closed', { sentence: 'the clipboard channel was closed; call again to reopen it' });
     }
-    if (this.#pending) {
+    // Two callers can otherwise both pass the #pending check while the first is
+    // still awaiting the socket/token; the device answers one frame at a time,
+    // so only one request may be in the channel at all.
+    if (this.#requesting || this.#pending) {
       throw new LinkrError('clipboard busy', { sentence: 'another clipboard request is still in flight; wait for it to finish' });
     }
-    const socket = await this.#ensureSocket();
-    const token = await this.#currentToken();
-    const frame = build(token);
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.#pending = null;
-        // A socket that stopped answering is not worth keeping.
-        this.#dropSocket();
-        reject(timeoutError(this.#timeoutMs));
-      }, this.#timeoutMs);
-      this.#pending = {
-        label,
-        expect,
-        resolve: (value) => {
-          clearTimeout(timer);
+    this.#requesting = true;
+    try {
+      const socket = await this.#ensureSocket();
+      const token = await this.#currentToken();
+      const frame = build(token);
+      return await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
           this.#pending = null;
-          this.#touchIdle();
-          resolve(value);
-        },
-        reject: (error) => {
-          clearTimeout(timer);
+          // A socket that stopped answering is not worth keeping.
+          this.#dropSocket();
+          reject(timeoutError(this.#timeoutMs));
+        }, this.#timeoutMs);
+        this.#pending = {
+          label,
+          expect,
+          resolve: (value) => {
+            clearTimeout(timer);
+            this.#pending = null;
+            this.#touchIdle();
+            resolve(value);
+          },
+          reject: (error) => {
+            clearTimeout(timer);
+            this.#pending = null;
+            reject(error);
+          },
+        };
+        try {
+          socket.send(frame);
+        } catch (error) {
           this.#pending = null;
-          reject(error);
-        },
-      };
-      try {
-        socket.send(frame);
-      } catch (error) {
-        this.#pending = null;
-        clearTimeout(timer);
-        reject(
-          new LinkrError('clipboard send failed', {
-            sentence: 'the control socket refused the clipboard request',
-            cause: error,
-          }),
-        );
-      }
-    });
+          clearTimeout(timer);
+          reject(
+            new LinkrError('clipboard send failed', {
+              sentence: 'the control socket refused the clipboard request',
+              cause: error,
+            }),
+          );
+        }
+      });
+    } finally {
+      this.#requesting = false;
+    }
   }
 
   async #currentToken() {

@@ -802,3 +802,10 @@ matters when `stop()` followed by `start()` replaces the socket before the old
 socket's asynchronous close event arrives; the late event used to clear the new
 `#ws` and kill the new session (and its ffmpeg child). `media-race.test.mjs`
 drives the interleaving with a stub WebSocket.
+
+Clipboard control requests are serialised at channel entry: one in-flight request
+per control socket (a second caller gets the existing "busy" sentence). The
+previous head-check only looked at `#pending`, which was set after awaiting the
+socket/token, so two concurrent callers could both send a frame and confuse the
+single reply slot. `control.test.mjs` asserts the second call is refused and only
+one frame reaches the device.
