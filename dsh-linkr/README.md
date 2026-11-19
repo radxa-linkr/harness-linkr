@@ -114,7 +114,7 @@ Settings live in the active profile's `cordis.patch.yml` row `linkr`:
 
 | Field | Meaning |
 | --- | --- |
-| `baseUrl` | device origin, host and optional port only, e.g. `http://linkr.local` or `http://192.168.8.171:80` (no credentials, path or query) |
+| `baseUrl` | device origin, host and optional port only, e.g. `http://linkr.local` or `http://192.0.2.10:80` (no credentials, path or query) |
 | `username` | device account name (`GET /api/account/info` reports it) |
 | `password` | device password; empty = use the `linkr/device` credentials record |
 | `codec` | `auto` \| `mjpeg` \| `h264` |

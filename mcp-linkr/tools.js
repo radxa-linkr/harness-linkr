@@ -309,8 +309,10 @@ export function createLinkrTools(config, { log = () => {} } = {}) {
       },
       afterVideoModeRestore: ({ origin }) => clearJournal({ pid: process.pid, origin }),
       // Idle stop and explicit disconnect both tear the session down. Another
-      // local app may take the device afterwards, so the lease must go too.
-      onSessionEnd: async () => {
+      // local app may take the device afterwards, so the lease must go too — but
+      // only when the device mode was actually restored.
+      onSessionEnd: async ({ restored }) => {
+        if (restored !== true) return;
         const release = releaseLease;
         if (!release) return;
         releaseLease = undefined;

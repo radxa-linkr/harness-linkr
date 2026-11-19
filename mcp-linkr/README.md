@@ -121,8 +121,10 @@ an OS-held loopback TCP lease per normalized device origin before connecting. A 
 process is refused until the owner stops, its session idles out or disconnects, or the process
 exits. Before every mode switch it journals
 `{origin, pid, baselineMode}` in a device-specific file under `$LINKR_STATE_DIR` (default `~/.linkr`).
-On the next connection, and via the one-shot `node index.js --restore-mode`, a journal whose owner
-process is gone is healed under that same lease: the
+The lease is released when the session stops, idles out or disconnects **and** the device reported
+its previous mode again; if the restore fails the lease stays held, so another local app cannot take
+over a device stuck in a session mode. On the next connection, and via the one-shot
+`node index.js --restore-mode`, a journal whose owner process is gone is healed under that same lease: the
 device is put back to the mode it had before that session, and the journal is removed. A graceful
 shutdown clears the journal itself. Smoke-tested by killing the server with SIGKILL and asserting
 the next start restores the fake device's mode.

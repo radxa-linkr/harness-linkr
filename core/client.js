@@ -760,10 +760,14 @@ export class LinkrClient {
     return this.#restoring;
   }
 
-  /** Let the owner release per-session resources (the MCP server: its lease). */
-  async #notifySessionEnd(reason) {
+  /**
+   * Let the owner release per-session resources (the MCP server: its lease).
+   * `restored` is false when the device mode could not be put back: handing the
+   * device to another app then would strand it in a session mode nobody owns.
+   */
+  async #notifySessionEnd(reason, restored) {
     try {
-      await this.#config.onSessionEnd?.({ reason });
+      await this.#config.onSessionEnd?.({ reason, restored });
     } catch {
       /* a cleanup callback must never break teardown */
     }
@@ -785,7 +789,9 @@ export class LinkrClient {
       this.#stoppingSession = false;
     }
     await this.#restoreVideoMode();
-    await this.#notifySessionEnd('disconnect');
+    // No debt left (modeOwned false) is the only state in which another app may
+    // take the device; a failed restore keeps the lease and the retry path.
+    await this.#notifySessionEnd('disconnect', this.#modeOwned === false);
   }
 
   #onSessionClosed(reason) {
