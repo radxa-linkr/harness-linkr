@@ -118,7 +118,8 @@ secrets.
 
 Harnesses often kill the MCP server instead of closing stdin (Codex does). The server acquires
 an OS-held loopback TCP lease per normalized device origin before connecting. A second local
-process is refused until the owner stops or exits. Before every mode switch it journals
+process is refused until the owner stops, its session idles out or disconnects, or the process
+exits. Before every mode switch it journals
 `{origin, pid, baselineMode}` in a device-specific file under `$LINKR_STATE_DIR` (default `~/.linkr`).
 On the next connection, and via the one-shot `node index.js --restore-mode`, a journal whose owner
 process is gone is healed under that same lease: the

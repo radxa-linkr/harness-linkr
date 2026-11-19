@@ -308,6 +308,14 @@ export function createLinkrTools(config, { log = () => {} } = {}) {
         check(activeSignal);
       },
       afterVideoModeRestore: ({ origin }) => clearJournal({ pid: process.pid, origin }),
+      // Idle stop and explicit disconnect both tear the session down. Another
+      // local app may take the device afterwards, so the lease must go too.
+      onSessionEnd: async () => {
+        const release = releaseLease;
+        if (!release) return;
+        releaseLease = undefined;
+        try { await release(); } catch { /* the port is already gone */ }
+      },
     });
   }
 

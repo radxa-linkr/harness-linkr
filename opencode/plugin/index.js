@@ -165,6 +165,7 @@ export default Plugin.define({
       callTool: (...args) => runtime.current.callTool(...args),
       onFrame: (listener) => runtime.current.onFrame(listener),
       panelState: () => runtime.current.panelState(),
+      keepAlive: () => runtime.current.keepAlive?.(),
       stop: () => runtime.current.stop(),
       latest: () => runtime.current.latest(),
     };

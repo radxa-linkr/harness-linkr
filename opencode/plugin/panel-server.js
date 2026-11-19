@@ -72,6 +72,9 @@ export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, f
 
   function broadcast(frame) {
     if (frame?.jpeg === undefined) return;
+    // A mounted viewer is still using the device: without this an idleStopMs
+    // timeout would stop the session under an open panel after two minutes.
+    tools.keepAlive?.();
     const now = Date.now();
     if (now - lastBroadcastAt < interval) return;
     lastBroadcastAt = now;

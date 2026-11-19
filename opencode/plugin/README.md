@@ -166,6 +166,9 @@ recent activity.
 
 ## Notes
 
+- A mounted panel keeps its session from idling out (every fanned-out frame calls the session's
+  keep-alive); closing the last viewer lets the session idle out, which restores the device mode and
+  releases the shared lease.
 - One Linkr session per machine: the device lease is shared with the DSH plugin and the MCP adapter.
   If another local panel (e.g. the DSH 「电脑」 tab) is streaming the same device, the Linkr panel
   starts but the page shows the lease sentence instead of a picture — disconnect the other session

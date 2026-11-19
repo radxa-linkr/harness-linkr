@@ -135,7 +135,7 @@ function normalizeOptions(options, base) {
   if (options.ffmpegPath !== undefined) next.ffmpegPath = String(options.ffmpegPath ?? '').trim();
   if (options.jpegQuality !== undefined) next.jpegQuality = clampJpegQuality(options.jpegQuality);
   if (options.pasteFastPath !== undefined) next.pasteFastPath = options.pasteFastPath === true;
-  for (const key of ['beforeVideoModeChange', 'afterVideoModeRestore']) {
+  for (const key of ['beforeVideoModeChange', 'afterVideoModeRestore', 'onSessionEnd']) {
     if (typeof options[key] === 'function') next[key] = options[key];
   }
   return next;
@@ -760,6 +760,15 @@ export class LinkrClient {
     return this.#restoring;
   }
 
+  /** Let the owner release per-session resources (the MCP server: its lease). */
+  async #notifySessionEnd(reason) {
+    try {
+      await this.#config.onSessionEnd?.({ reason });
+    } catch {
+      /* a cleanup callback must never break teardown */
+    }
+  }
+
   async #teardown() {
     this.#clearIdle();
     this.#dropClipboard();
@@ -776,6 +785,7 @@ export class LinkrClient {
       this.#stoppingSession = false;
     }
     await this.#restoreVideoMode();
+    await this.#notifySessionEnd('disconnect');
   }
 
   #onSessionClosed(reason) {

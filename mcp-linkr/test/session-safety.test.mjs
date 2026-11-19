@@ -18,11 +18,11 @@ async function until(fn) {
   const deadline = Date.now() + 6000;
   while (!fn()) { assert.ok(Date.now() < deadline, 'condition timed out'); await sleep(10); }
 }
-async function fixture(t) {
+async function fixture(t, extraEnv = {}) {
   const scratch = await mkdtemp(join(tmpdir(), 'linkr-safety-'));
   const fake = createFakeDevice({ initialCodec: 0 });
   const origin = await fake.listen();
-  const env = { LINKR_BASE_URL: origin, LINKR_USERNAME: 'tester', LINKR_PASSWORD: 's3cret', LINKR_CODEC: 'mjpeg', LINKR_STATE_DIR: join(scratch, 'state'), LINKR_SAVE_DIR: join(scratch, 'captures'), LINKR_IDLE_STOP_MS: '60000' };
+  const env = { LINKR_BASE_URL: origin, LINKR_USERNAME: 'tester', LINKR_PASSWORD: 's3cret', LINKR_CODEC: 'mjpeg', LINKR_STATE_DIR: join(scratch, 'state'), LINKR_SAVE_DIR: join(scratch, 'captures'), LINKR_IDLE_STOP_MS: '60000', ...extraEnv };
   const clients = [];
   t.after(async () => { for (const client of clients) await client.close(); await fake.close(); await rm(scratch, { recursive: true, force: true }); });
   async function start() {
@@ -45,6 +45,20 @@ test('SIGKILL after mode write but before first frame is recoverable', async t =
   const restore = spawn(process.execPath, [server, '--restore-mode'], { env: { ...process.env, ...env }, stdio: 'ignore' });
   const [code] = await once(restore, 'exit');
   assert.equal(code, 0); assert.equal(fake.codec, 0);
+});
+
+test('an idle-stopped session releases the device lease for another app', async t => {
+  const { fake, start } = await fixture(t, { LINKR_IDLE_STOP_MS: '300' });
+  const first = await start();
+  assert.ok(!(await first.tool('linkr_computer_use', { action: 'capture' }).result).isError);
+  await until(() => fake.codec === 1);
+  // No viewer, no input: the transport idles the session out and restores the mode.
+  await until(() => fake.codec === 0);
+  await sleep(200);
+  const second = await start();
+  const capture = await second.tool('linkr_computer_use', { action: 'capture' }).result;
+  assert.ok(!capture.isError, `another app could not connect after the idle stop: ${JSON.stringify(capture).slice(0, 200)}`);
+  assert.equal(fake.codec, 1);
 });
 
 test('cancelled queued click never reaches HID, and a running wait is interruptible', async t => {

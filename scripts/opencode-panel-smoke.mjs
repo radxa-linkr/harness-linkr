@@ -31,6 +31,7 @@ async function check(name, fn) {
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0xff, 0xd9]);
 let frames = [];
 let calls = [];
+let keepAliveCalls = 0;
 let stopped = false;
 const stub = {
   async callTool(name, args = {}) {
@@ -48,6 +49,9 @@ const stub = {
   },
   panelState() {
     return { state: { connected: true, codec: 'h264', width: 2, height: 2, fps: 10 }, activity: [{ at: Date.now(), action: '截图', detail: '2×2' }] };
+  },
+  keepAlive() {
+    keepAliveCalls += 1;
   },
   async stop() {
     stopped = true;
@@ -96,6 +100,7 @@ await check('the MJPEG stream starts a session and carries JPEG frames', async (
   const text = Buffer.from(value.buffer ?? value).toString('latin1');
   assert.match(text, /Content-Type: image\/jpeg/);
   assert.ok(Buffer.from(value.buffer ?? value).includes(JPEG), 'the frame bytes must be in the part');
+  assert.ok(keepAliveCalls >= 1, 'a mounted viewer must keep the idle session alive');
 });
 
 await check('state reports the session and recent activity', async () => {
