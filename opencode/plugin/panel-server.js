@@ -56,7 +56,7 @@ async function readBody(request, limit = 1024 * 1024) {
  *
  * @param {{ tools: object, host?: string, port?: number, fps?: number, token?: string }} options
  */
-export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, fps = 10, token = randomBytes(16).toString('hex') } = {}) {
+export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, fps = 10, detachGraceMs = 8000, token = randomBytes(16).toString('hex') } = {}) {
   if (!tools || typeof tools.callTool !== 'function') throw new Error('createPanelServer needs the Linkr tools instance');
 
   const subscribers = new Set();
@@ -67,6 +67,9 @@ export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, f
   let lastBroadcastAt = 0;
   let lastError = '';
   let closed = false;
+  /** True when this panel is the component that opened the device session. */
+  let panelStarted = false;
+  let detachTimer = null;
 
   const interval = 1000 / Math.max(1, Math.min(30, Number(fps) || 10));
 
@@ -116,12 +119,41 @@ export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, f
   async function ensureSession() {
     // The first capture opens the device session; frames then arrive through
     // the session's listener and are fanned out to the browser.
+    const wasConnected = tools.panelState?.()?.state?.connected === true;
     const result = await tools.callTool('linkr_computer_use', { action: 'capture' }, {});
     if (result?.isError === true) {
       const text = (result.content ?? []).filter((block) => block?.type === 'text').map((block) => block.text).join(' ');
       throw new Error(text === '' ? 'the device is not available' : text);
     }
+    if (!wasConnected && tools.panelState?.()?.state?.connected === true) panelStarted = true;
     return result;
+  }
+
+  function clearDetach() {
+    if (detachTimer !== null) {
+      clearTimeout(detachTimer);
+      detachTimer = null;
+    }
+  }
+
+  /**
+   * Last viewer gone: if this panel opened the session and the agent has not
+   * used it lately, end it after a short grace so the device and its lease are
+   * free. A reconnect (new viewer) cancels the timer.
+   */
+  function scheduleDetach() {
+    if (!panelStarted || subscribers.size > 0 || typeof tools.releaseIfIdle !== 'function') return;
+    clearDetach();
+    detachTimer = setTimeout(() => {
+      detachTimer = null;
+      Promise.resolve()
+        .then(() => tools.releaseIfIdle({ idleMs: detachGraceMs }))
+        .then((released) => {
+          if (released === true) panelStarted = false;
+        })
+        .catch(() => {});
+    }, Math.max(0, Number(detachGraceMs) || 0));
+    detachTimer.unref?.();
   }
 
   async function handleStream(request, response) {
@@ -134,6 +166,7 @@ export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, f
     // stream open before the first frame exists.
     response.flushHeaders?.();
     subscribers.add(response);
+    clearDetach();
     // A new viewer starts a new session: do not replay the last frame of a
     // previous one while the device connects.
     if (subscribers.size === 1) lastFrame = null;
@@ -154,6 +187,7 @@ export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, f
       subscribers.delete(response);
       blocked.delete(response);
       unwatchFramesIfIdle();
+      scheduleDetach();
     });
   }
 

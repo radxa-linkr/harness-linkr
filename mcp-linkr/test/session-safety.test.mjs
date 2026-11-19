@@ -11,6 +11,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { createFakeDevice } from '../../dsh-linkr/test/fake-device.mjs';
 import { LinkrClient } from '../../dsh-linkr/lib/index.js';
 import { createLinkrTools } from '../tools.js';
+import { readConfig } from '../config.js';
 import { createPanelBridge } from '../panel.js';
 
 const server = fileURLToPath(new URL('../index.js', import.meta.url));
@@ -59,6 +60,30 @@ test('an idle-stopped session releases the device lease for another app', async 
   const capture = await second.tool('linkr_computer_use', { action: 'capture' }).result;
   assert.ok(!capture.isError, `another app could not connect after the idle stop: ${JSON.stringify(capture).slice(0, 200)}`);
   assert.equal(fake.codec, 1);
+});
+
+test('releaseIfIdle only ends a session the agent has not touched lately', async t => {
+  const scratch = await mkdtemp(join(tmpdir(), 'linkr-release-idle-'));
+  const fake = createFakeDevice({ initialCodec: 0 });
+  const origin = await fake.listen();
+  const tools = createLinkrTools(readConfig({
+    LINKR_BASE_URL: origin, LINKR_USERNAME: 'tester', LINKR_PASSWORD: 's3cret',
+    LINKR_CODEC: 'mjpeg', LINKR_STATE_DIR: join(scratch, 'state'),
+    LINKR_SAVE_DIR: join(scratch, 'captures'), LINKR_FFMPEG_PATH: '/nonexistent-ffmpeg',
+  }));
+  t.after(async () => {
+    await tools.dispose().catch(() => {});
+    await fake.close();
+    await rm(scratch, { recursive: true, force: true });
+  });
+  const capture = await tools.callTool('linkr_computer_use', { action: 'capture' });
+  assert.ok(!capture.isError, JSON.stringify(capture).slice(0, 200));
+  assert.equal(fake.codec, 1);
+  assert.equal(await tools.releaseIfIdle({ idleMs: 60000 }), false, 'recent agent use keeps the session');
+  await sleep(150);
+  assert.equal(await tools.releaseIfIdle({ idleMs: 100 }), true);
+  assert.equal(fake.codec, 0, 'the device mode was restored');
+  assert.equal(tools.panelState().state.connected, false);
 });
 
 test('cancelled queued click never reaches HID, and a running wait is interruptible', async t => {

@@ -266,6 +266,7 @@ export function createLinkrTools(config, { log = () => {} } = {}) {
   let acquiring;
   let disposed = false;
   let stopped = false;
+  let lastUseAt = 0;
   let activeSignal;
   let control = null;
   let revision = 0;
@@ -469,6 +470,24 @@ export function createLinkrTools(config, { log = () => {} } = {}) {
     return panelState();
   }
 
+  /**
+   * End a session that only a panel viewer was keeping alive.
+   *
+   * The caller is the panel server, after its last viewer went away; the agent
+   * may still be working, so a session touched within `idleMs` (or a human
+   * takeover) is left alone. Disconnecting restores the mode and (via
+   * onSessionEnd) releases the lease; the next capture starts a new session.
+   */
+  async function releaseIfIdle({ idleMs = 10000 } = {}) {
+    if (disposed || stopped || configuring > 0 || controlOwner() !== '') return false;
+    const instance = client;
+    if (!instance || instance.state.connected !== true) return false;
+    const idleFor = Date.now() - lastUseAt;
+    if (idleFor < Math.max(0, Number(idleMs) || 0)) return false;
+    await instance.disconnect();
+    return true;
+  }
+
   async function runPanel(args, signal) {
     const action = args.action ?? 'open';
     if (action === 'start') { await connect(signal, true); record('会话', '已连接'); }
@@ -653,6 +672,7 @@ export function createLinkrTools(config, { log = () => {} } = {}) {
   async function callTool(name, args, { signal } = {}) {
     try {
       activeSignal = signal;
+      lastUseAt = Date.now();
       check(signal);
       if (name === STATUS_TOOL.name) return await runStatus();
       if (name === PANEL_TOOL.name) return await runPanel(args ?? {}, signal);
@@ -697,7 +717,7 @@ export function createLinkrTools(config, { log = () => {} } = {}) {
     releaseLease = undefined;
   }
 
-  return { callTool, dispose, panelState, panelOpen, preview, heartbeat, settings, saveSettings, logout, beginConfiguration, clipboardSnapshot,
+  return { callTool, dispose, panelState, panelOpen, preview, heartbeat, settings, saveSettings, logout, beginConfiguration, clipboardSnapshot, releaseIfIdle,
     isConfiguring: () => configuring > 0, latest: () => client?.latest() ?? null,
     onFrame: listener => current().onFrame(listener), keepAlive: () => client?.keepAlive(), stop };
 }

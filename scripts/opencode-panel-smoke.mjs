@@ -33,10 +33,13 @@ let frames = [];
 let calls = [];
 let keepAliveCalls = 0;
 let stopped = false;
+let connected = false;
+let released = 0;
 const stub = {
   async callTool(name, args = {}) {
     calls.push({ name, args });
     if (name === 'linkr_computer_use' && args.action === 'capture') {
+      connected = true;
       return { content: [{ type: 'text', text: 'captured 2x2' }], value: { path: '', width: 2, height: 2 } };
     }
     return { content: [{ type: 'text', text: 'ok' }], value: { ok: true } };
@@ -48,17 +51,22 @@ const stub = {
     };
   },
   panelState() {
-    return { state: { connected: true, codec: 'h264', width: 2, height: 2, fps: 10 }, activity: [{ at: Date.now(), action: '截图', detail: '2×2' }] };
+    return { state: { connected, codec: 'h264', width: 2, height: 2, fps: 10 }, activity: [{ at: Date.now(), action: '截图', detail: '2×2' }] };
   },
   keepAlive() {
     keepAliveCalls += 1;
+  },
+  async releaseIfIdle() {
+    released += 1;
+    connected = false;
+    return true;
   },
   async stop() {
     stopped = true;
   },
 };
 
-const server = await createPanelServer({ tools: stub, fps: 30 });
+const server = await createPanelServer({ tools: stub, fps: 30, detachGraceMs: 200 });
 
 await check('the page and its static assets load without a token', async () => {
   const bare = server.url.split('?')[0];
@@ -127,6 +135,12 @@ await check('input is forwarded to the Linkr tools', async () => {
   const last = calls.at(-1);
   assert.equal(last.name, 'linkr_computer_use');
   assert.equal(last.args.action, 'move');
+});
+
+await check('closing the last viewer releases a panel-started session', async () => {
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  assert.equal(released, 1, 'one release after the detach grace');
+  assert.equal(connected, false, 'the panel-started session is gone');
 });
 
 await check('disconnect calls stop; close releases the server', async () => {

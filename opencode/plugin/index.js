@@ -166,6 +166,7 @@ export default Plugin.define({
       onFrame: (listener) => runtime.current.onFrame(listener),
       panelState: () => runtime.current.panelState(),
       keepAlive: () => runtime.current.keepAlive?.(),
+      releaseIfIdle: (options) => runtime.current.releaseIfIdle?.(options),
       stop: () => runtime.current.stop(),
       latest: () => runtime.current.latest(),
     };
