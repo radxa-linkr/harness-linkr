@@ -147,6 +147,9 @@ quality knob at 1080p H.264: `jpegQuality: 4` → ~300 KB/frame, 6.8 MB/s at 24 
 - **Person**: right column → **电脑** → click into the picture to focus, then type. The activity
   list under the picture shows the agent's calls (and yours) as they happen. **断开**
   stops the session and gives the device its video mode back; **连接** or **刷新画面** resumes.
+  Closing the last live panel stream also ends a session that the panel itself opened, after an
+  8 s grace, unless the agent used it in that window — so closing the panel frees the device and
+  its cross-process lease instead of waiting for `idleStopMs`.
 
 Session semantics that matter:
 

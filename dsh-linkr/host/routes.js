@@ -41,8 +41,31 @@ async function readJsonBody(req) {
 export function registerRoutes(ctx, deps) {
   /** Every live screen stream the plugin handed out, so a dispose or a disconnect can end them. */
   const liveStreams = new Set();
+  /** Wait after the last viewer before ending a session the panel itself opened. */
+  const PANEL_DETACH_MS = 8000;
+  let detachTimer = null;
+
+  function clearDetachTimer() {
+    if (detachTimer !== null) {
+      clearTimeout(detachTimer);
+      detachTimer = null;
+    }
+  }
+
+  /** The last viewer is gone: let an untouched, panel-started session go. */
+  function schedulePanelDetach() {
+    if (detachTimer !== null || typeof deps.client.releaseIfIdle !== 'function') return;
+    detachTimer = setTimeout(() => {
+      detachTimer = null;
+      Promise.resolve()
+        .then(() => deps.client.releaseIfIdle({ idleMs: PANEL_DETACH_MS }))
+        .catch(() => {});
+    }, PANEL_DETACH_MS);
+    detachTimer.unref?.();
+  }
 
   function stopLiveStreams() {
+    clearDetachTimer();
     for (const entry of [...liveStreams]) {
       try {
         entry.stop();
@@ -60,8 +83,15 @@ export function registerRoutes(ctx, deps) {
    */
   function openLiveStream(req, res) {
     void (async () => {
+      clearDetachTimer();
+      let panelStarted = false;
       let current;
       try {
+        try {
+          panelStarted = (await deps.client.stateJson()).connected !== true;
+        } catch {
+          panelStarted = false;
+        }
         current = await deps.client.liveClient();
       } catch (error) {
         // An <img> cannot read a body; the panel turns a failed load into a retry
@@ -103,6 +133,7 @@ export function registerRoutes(ctx, deps) {
           unsubscribe = null;
         }
         if (entry !== null) liveStreams.delete(entry);
+        if (liveStreams.size === 0 && panelStarted) schedulePanelDetach();
         try {
           res.end();
         } catch {
@@ -528,6 +559,7 @@ export function registerRoutes(ctx, deps) {
 
   return () => {
     stopLiveStreams();
+    clearDetachTimer();
     unregister();
   };
 }

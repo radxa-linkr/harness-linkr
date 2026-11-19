@@ -137,6 +137,8 @@ export function createClientManager(deps) {
   let clientSignature = '';
   /** Last observed session facts, so a transition noticed late still gets an entry. */
   let wasConnected = false;
+  /** Last time an agent/panel action used the session (for panel detach). */
+  let lastUseAt = 0;
   let lastNotice = '';
 
   function configSignature() {
@@ -266,6 +268,7 @@ export function createClientManager(deps) {
    * about a "connect" step first, and `connect()` is idempotent by contract.
    */
   async function liveClient() {
+    lastUseAt = Date.now();
     const current = await currentClient();
     await current.connect();
     return current;
@@ -294,6 +297,23 @@ export function createClientManager(deps) {
       modeOwned: state.modeOwned === true && SESSION_MODES.includes(state.videoMode),
       stopped: deps.explicitStop,
     };
+  }
+
+  /**
+   * End a session that only the panel was keeping alive.
+   *
+   * Called by the routes after the last live stream closed. An explicit Stop
+   * (deps.explicitStop) always wins, and a session the agent touched within
+   * `idleMs` is left alone. Disconnecting restores the mode and releases the
+   * journal; the next capture starts a new session.
+   */
+  async function releaseIfIdle({ idleMs = 10000 } = {}) {
+    if (deps.explicitStop) return false;
+    const instance = client;
+    if (!instance || instance.state.connected !== true) return false;
+    if (Date.now() - lastUseAt < Math.max(0, Number(idleMs) || 0)) return false;
+    await instance.disconnect();
+    return true;
   }
 
   /** Plain state for the tools and `/linkr/state`; never throws. */
@@ -573,6 +593,7 @@ export function createClientManager(deps) {
     applyInput,
     statusText,
     clipboardSnapshot,
+    releaseIfIdle,
     invalidateClipboard: () => {
       clipboardProbe = { at: 0, value: null };
     },

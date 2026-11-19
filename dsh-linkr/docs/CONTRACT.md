@@ -816,3 +816,14 @@ The H.264 decode path bounds its input: when ffmpeg's stdin reports backpressure
 keyframe). The previous code wrote every packet and let Node buffer without
 limit. `decoder-backpressure.test.mjs` stalls the decoder with a fake ffmpeg that
 never reads stdin and asserts packets were dropped.
+
+
+The Host ends a session that only the Web UI panel was keeping alive: when the
+last `/linkr/live.mjpeg` stream closes and the panel opened that session
+(`stateJson().connected` was false before `liveClient()`), `registerRoutes`
+schedules `deps.client.releaseIfIdle({idleMs: PANEL_DETACH_MS})` after 8 s; a new
+stream cancels it. The manager releases only when `deps.explicitStop` is false,
+the session is connected and `lastUseAt` (updated by every `liveClient()` — agent
+tool or panel stream) is older than `idleMs`; the disconnect restores the mode
+through the normal path. A session started or recently used by the agent is left
+to the configured idle stop. `release-idle.test.mjs` covers the manager guards.
