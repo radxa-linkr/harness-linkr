@@ -243,6 +243,8 @@ export class MediaSession {
   #decoderStderr = '';
   #decoderFailed = false;
   #decoderError = null;
+  #decoderBlocked = false;
+  #decoderDropped = 0;
   #splitter = null;
 
   /**
@@ -298,6 +300,7 @@ export class MediaSession {
       codec: this.#codec,
       packets: this.#packets,
       decoder: this.#decoder ? 'ffmpeg' : null,
+      dropped: this.#decoderDropped,
     };
   }
 
@@ -485,11 +488,16 @@ export class MediaSession {
     this.#decoderPath = path;
     this.#decoderStderr = '';
     this.#decoderFailed = false;
+    this.#decoderBlocked = false;
+    this.#decoderDropped = 0;
     this.#splitter = new JpegStreamSplitter();
 
     child.stdout.on('data', (chunk) => this.#onDecoderStdout(chunk));
     child.stderr.on('data', (chunk) => {
       this.#decoderStderr = `${this.#decoderStderr}${chunk.toString('utf8')}`.slice(-400);
+    });
+    child.stdin.on('drain', () => {
+      this.#decoderBlocked = false;
     });
     child.stdin.on('error', (error) => {
       this.#onDecoderFailure(`ffmpeg stdin closed: ${error?.message ?? error}`);
@@ -575,8 +583,15 @@ export class MediaSession {
     this.#packets += 1;
     const child = this.#decoder;
     if (!child || child.stdin.destroyed || !child.stdin.writable) return;
+    // A stalled decoder must not grow an unbounded packet queue: live video is
+    // disposable, so packets are dropped until the pipe drains (ffmpeg resyncs
+    // at the next keyframe).
+    if (this.#decoderBlocked) {
+      this.#decoderDropped += 1;
+      return;
+    }
     try {
-      child.stdin.write(payload);
+      if (!child.stdin.write(payload)) this.#decoderBlocked = true;
     } catch {
       // The exit handler already reported the failure.
     }

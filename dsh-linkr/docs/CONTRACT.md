@@ -809,3 +809,10 @@ previous head-check only looked at `#pending`, which was set after awaiting the
 socket/token, so two concurrent callers could both send a frame and confuse the
 single reply slot. `control.test.mjs` asserts the second call is refused and only
 one frame reaches the device.
+
+The H.264 decode path bounds its input: when ffmpeg's stdin reports backpressure,
+`MediaSession` drops further ws-media packets until 'drain' and counts them in
+`stats.dropped` (live video is disposable; ffmpeg resynchronises at the next
+keyframe). The previous code wrote every packet and let Node buffer without
+limit. `decoder-backpressure.test.mjs` stalls the decoder with a fake ffmpeg that
+never reads stdin and asserts packets were dropped.
