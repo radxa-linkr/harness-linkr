@@ -482,6 +482,10 @@ export function createFakeDevice(options = {}) {
           json(res, 200, { code: 1, message: 'video_codec must be an integer', data: {} });
           return;
         }
+        if (state.codecWriteFails === true) {
+          json(res, 500, { code: 1, message: 'video_codec write failed (injected)', data: {} });
+          return;
+        }
         state.codecWrites.push({ video_codec: value, at: Date.now() });
         state.codec = value;
         ok(res, {});
@@ -663,6 +667,13 @@ export function createFakeDevice(options = {}) {
     },
     get codecWrites() {
       return state.codecWrites;
+    },
+    /** Inject a failing POST /api/video/codec (the device drops the write). */
+    get codecWriteFails() {
+      return state.codecWriteFails === true;
+    },
+    set codecWriteFails(value) {
+      state.codecWriteFails = value === true;
     },
     get hidFrames() {
       return state.hidFrames;
