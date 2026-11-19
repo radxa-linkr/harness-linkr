@@ -60,6 +60,7 @@ export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, f
   if (!tools || typeof tools.callTool !== 'function') throw new Error('createPanelServer needs the Linkr tools instance');
 
   const subscribers = new Set();
+  const blocked = new Set();
   const tokenValue = String(token);
   let stopFrames = null;
   let lastFrame = null;
@@ -76,13 +77,16 @@ export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, f
     lastBroadcastAt = now;
     const head = Buffer.from(`--${BOUNDARY}\r\nContent-Type: image/jpeg\r\nContent-Length: ${frame.jpeg.length}\r\n\r\n`, 'utf8');
     const tail = Buffer.from('\r\n', 'utf8');
+    const part = Buffer.concat([head, frame.jpeg, tail]);
     for (const response of subscribers) {
+      // A slow browser keeps only the newest frame; its socket buffer stays
+      // bounded instead of queueing every frame of the stream.
+      if (blocked.has(response)) continue;
       try {
-        response.write(head);
-        response.write(frame.jpeg);
-        response.write(tail);
+        if (!response.write(part)) blocked.add(response);
       } catch {
         subscribers.delete(response);
+        blocked.delete(response);
       }
     }
   }
@@ -137,12 +141,15 @@ export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, f
       response.write(Buffer.from(`--${BOUNDARY}\r\nContent-Type: text/plain\r\n\r\n${lastError}\r\n`));
       response.end();
       subscribers.delete(response);
+      blocked.delete(response);
       return;
     }
     watchFrames();
     if (lastFrame !== null) broadcast(lastFrame);
+    response.on('drain', () => blocked.delete(response));
     request.on('close', () => {
       subscribers.delete(response);
+      blocked.delete(response);
       unwatchFramesIfIdle();
     });
   }

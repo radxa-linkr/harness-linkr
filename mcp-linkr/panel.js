@@ -32,7 +32,7 @@ export function createPanelBridge(tools, { changeSettings = task => task(new Abo
       ended = true;
       clearInterval(timer); unsubscribe(); streams.delete(stop); res.end();
     };
-    const interval = Math.round(1000 / Math.max(1, Math.min(30, tools.settings().streamFps)));
+    const interval = Math.round(1000 / Math.max(1, Math.min(60, tools.settings().streamFps)));
     const timer = setInterval(() => {
       if (!tools.panelState().state.connected || tools.panelState().revision !== revision) { stop(); return; }
       tools.keepAlive();

@@ -71,6 +71,16 @@ test('settings persist across server restart, including blank-password updates a
   assert.equal((await readdir(join(f.scratch, 'credentials'))).length, 1, 'superseded managed passwords were not removed');
 });
 
+test('stream frame rate accepts 1-60 like the transport (the MJPEG source caps around 37)', async t => {
+  const f = await fixture(t); const d = await f.device(); const panel = await f.start();
+  assert.equal((await panel.post({ ...f.body(d), streamFps: 60 })).status, 200);
+  const high = await panel.post({ ...f.body(d), streamFps: 61 });
+  assert.equal(high.status, 400);
+  assert.match(await high.text(), /1–60|1-60/);
+  const low = await panel.post({ ...f.body(d), streamFps: 0 });
+  assert.equal(low.status, 400);
+});
+
 test('changing device requires a fresh password and restores the old mode before connecting', async t => {
   const f = await fixture(t); const a = await f.device(); const b = await f.device({ password: 'another-password', loginDelayMs: 150 }); const panel = await f.start();
   await panel.post(f.body(a));

@@ -94,7 +94,7 @@ export function loginCandidate(body, config) {
     username,
     password,
     codec,
-    fps: integer(body.streamFps, config.client.fps || 20, 1, 30, '帧率'),
+    fps: integer(body.streamFps, config.client.fps || 20, 1, 60, '帧率'),
     jpegQuality: integer(
       body.jpegQuality,
       config.client.jpegQuality || 4,
