@@ -32,7 +32,9 @@ Verified end to end on 2026-11-06 against a Radxa Linkr at `linkr.local` (fw `1.
 - The device's `video_codec` is a **global** setting (`1` MJPEG, `2` H.264 over WebSocket), so a
   session switches it to the codec's mode and **always restores the previous value** when it stops
   — on idle, on an explicit stop, on error and on plugin dispose (`manageVideoMode: false` forbids
-  the write).
+  the write). The baseline is journalled under `~/.linkr/mcp-session-<origin>.json`
+  (`LINKR_STATE_DIR` moves it) before the switch, so a killed host or a Cordis reload in place is
+  healed on the next apply; the MCP server and `--restore-mode`/`doctor` read the same journal.
 - An **API key** from the device UI cannot authenticate against `/api/*`: Bearer, `X-API-Key`,
   query parameter, login body and https all answer `403` (measured on fw 1.6.0). The plugin logs in
   with the device account.

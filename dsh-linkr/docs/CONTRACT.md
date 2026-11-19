@@ -765,3 +765,16 @@ leave the transport; clipboard text, raw device messages and tokens are excluded
 carries the device revision so an old probe cannot label a new session. Stopping or changing
 settings invalidates an outstanding result without reconnecting the device. The UI probes at
 most once per ten seconds while visible and live; unknown/working capabilities add no chrome.
+
+
+Video-mode recovery is shared between the two harnesses since `fb06e8b`'s follow-up: the journal
+(`stateDirectory()`/`journalPath()`/`writeJournal()`/`clearJournal()`), the stale-owner rules and
+the HTTP restore moved from `mcp-linkr/device-mode.js` to `core/journal.js` and `core/recover.js`,
+which `scripts/sync-core.mjs` materializes into `dsh-linkr/lib/` and the MCP server imports. Both
+`LinkrClient` users pass the same hooks: write `{pid, instance?, origin, baselineMode, mode, at}`
+before a mode switch, clear after the restore. The MCP server keeps its cross-process lease around
+the restore; the DSH Host instead repairs a leftover journal before it builds the first client of
+an apply, allowing the same pid (Cordis reloads the plugin in place) and skipping the work when
+`manageVideoMode` is false. `core/recover.js` refuses a journal whose owner pid is alive, verifies
+the device reports the restored mode, and clears the record; a dead-owner record without a finite
+baseline is discarded. `dsh-linkr/test/recovery.test.mjs` covers the hook and the same-pid repair.

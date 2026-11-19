@@ -7,10 +7,13 @@
  * writes into, one `input(action)` path, the clipboard probe, and the
  * state/status text both the tools and the routes answer from.
  */
+import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 
 import { LinkrClient, LinkrError } from '../lib/index.js';
+import { clearJournal, writeJournal } from '../lib/journal.js';
+import { recoverStaleSession as recoverDeviceMode } from '../lib/recover.js';
 
 /** The credentials record the device password lives in, when the service exists. */
 export const CREDENTIAL_KEY = 'linkr/device';
@@ -123,6 +126,11 @@ export function createClientManager(deps) {
   const { ctx } = deps;
   const config = deps.config;
 
+  /** Identifies journals written by this applied plugin, not just this pid. */
+  const instance = randomUUID();
+  /** Device origins whose stale mode was already repaired in this apply. */
+  const recoveredOrigins = new Set();
+
   /** The one client every tool and every route uses. Created lazily. */
   let client = null;
   /** What the current client was built from; a mismatch means "rebuild". */
@@ -184,12 +192,55 @@ export function createClientManager(deps) {
     }
   }
 
+  /**
+   * Repair a device left in a session mode by a killed plugin instance.
+   *
+   * This runs before the first client of this apply is built, so no live session
+   * can be using the device. A journal with our own pid is still repaired: a
+   * Cordis reload can apply a new plugin in the same process, and the old
+   * client's restore may never have landed. `manageVideoMode: false` means the
+   * user asked the plugin to keep its hands off the device mode, so skip.
+   */
+  async function recoverStaleDeviceMode(password) {
+    if (config.manageVideoMode === false || password === '') return;
+    const origin = config.baseUrl || '';
+    if (origin === '' || recoveredOrigins.has(origin)) return;
+    recoveredOrigins.add(origin);
+    try {
+      await recoverDeviceMode(
+        { baseUrl: config.baseUrl, username: config.username, password },
+        () => {},
+        { allowSamePid: true },
+      );
+    } catch {
+      /* recovery is best effort; the next session still reports real errors */
+    }
+  }
+
+  /** Journal hooks: record the baseline before switching, clear it after restoring. */
+  const modeHooks = {
+    beforeVideoModeChange: async ({ origin, priorMode, targetMode }) => {
+      await writeJournal({
+        pid: process.pid,
+        instance,
+        origin,
+        baselineMode: priorMode,
+        mode: targetMode,
+        at: Date.now(),
+      });
+    },
+    afterVideoModeRestore: async ({ origin }) => {
+      await clearJournal({ pid: process.pid, force: false, origin });
+    },
+  };
+
   /** The shared client, built on first use and rebuilt whenever the settings changed. */
   async function currentClient() {
     const signature = configSignature();
     if (client !== null && clientSignature === signature) return client;
     if (client !== null) await disposeClient();
     const password = await readPassword();
+    await recoverStaleDeviceMode(password);
     client = new LinkrClient({
       baseUrl: config.baseUrl,
       username: config.username,
@@ -203,6 +254,7 @@ export function createClientManager(deps) {
       manageVideoMode: config.manageVideoMode,
       fps: config.streamFps,
       idleStopMs: config.idleStopMs,
+      ...modeHooks,
     });
     clientSignature = signature;
     return client;
