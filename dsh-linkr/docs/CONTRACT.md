@@ -794,3 +794,11 @@ teardown, report the session end at most once (and not at all when there was no
 session and no mode debt), and retry a video-mode restore that failed earlier.
 `session-end.test.mjs` covers dispose idempotency, disconnect-after-dispose, and
 an idle stop whose restore fails before a later dispose heals it.
+
+
+The media socket carries its identity in its handlers: a 'message' or 'close'
+from a WebSocket that is no longer the session's current `#ws` is ignored. This
+matters when `stop()` followed by `start()` replaces the socket before the old
+socket's asynchronous close event arrives; the late event used to clear the new
+`#ws` and kill the new session (and its ffmpeg child). `media-race.test.mjs`
+drives the interleaving with a stub WebSocket.

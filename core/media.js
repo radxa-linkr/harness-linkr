@@ -358,8 +358,11 @@ export class MediaSession {
         { once: true },
       );
     });
-    ws.addEventListener('message', (event) => this.#onMessage(event));
-    ws.addEventListener('close', (event) => this.#onClose(event));
+    // Keep the socket identity: stop() + start() can replace `#ws` before this
+    // socket's close event arrives, and that late event must not tear down the
+    // new session.
+    ws.addEventListener('message', (event) => this.#onMessage(ws, event));
+    ws.addEventListener('close', (event) => this.#onClose(ws, event));
 
     try {
       const openBudget = Math.max(1000, deadline - Date.now());
@@ -549,7 +552,8 @@ export class MediaSession {
 
   /* ------------------------------------------------------------------- socket */
 
-  #onMessage(event) {
+  #onMessage(ws, event) {
+    if (this.#ws !== ws) return;
     const buf = toBuffer(event?.data);
     if (!buf) return;
     if (this.#codec === 'h264') {
@@ -611,12 +615,17 @@ export class MediaSession {
     }
   }
 
-  #onClose(event) {
+  #onClose(ws, event) {
+    if (this.#ws !== ws) {
+      // A socket that was already replaced (or stopped) by the time its close
+      // event arrived. Our own stop() leaves #ws null, so settle the stopping
+      // flag; a replaced socket must leave the new session untouched.
+      if (this.#ws === null) this.#stopping = false;
+      return;
+    }
     const wasStopping = this.#stopping;
     this.#stopping = false;
-    const ws = this.#ws;
     this.#ws = null;
-    if (ws === null && wasStopping) return;
     this.#failWaiters('the media socket closed');
     this.#killDecoder();
     if (!wasStopping) {

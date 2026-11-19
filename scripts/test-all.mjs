@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const SUITES = [
-  { name: 'dsh-linkr unit tests', cwd: join(ROOT, 'dsh-linkr'), command: process.execPath, args: ['--test', 'test/client.test.mjs', 'test/control.test.mjs', 'test/ffmpeg.test.mjs', 'test/h264.test.mjs', 'test/hid.test.mjs', 'test/linkr.test.mjs', 'test/locale.test.mjs', 'test/recovery.test.mjs', 'test/session-end.test.mjs', 'test/wsmedia.test.mjs'] },
+  { name: 'dsh-linkr unit tests', cwd: join(ROOT, 'dsh-linkr'), command: process.execPath, args: ['--test', 'test/client.test.mjs', 'test/control.test.mjs', 'test/ffmpeg.test.mjs', 'test/h264.test.mjs', 'test/hid.test.mjs', 'test/linkr.test.mjs', 'test/locale.test.mjs', 'test/media-race.test.mjs', 'test/recovery.test.mjs', 'test/session-end.test.mjs', 'test/wsmedia.test.mjs'] },
   { name: 'dsh-linkr host smoke', cwd: join(ROOT, 'dsh-linkr'), command: process.execPath, args: ['test/host-smoke.mjs'] },
   { name: 'mcp-linkr journal unit', cwd: join(ROOT, 'mcp-linkr'), command: process.execPath, args: ['test/device-mode.test.mjs'] },
   { name: 'mcp-linkr stdio smoke', cwd: join(ROOT, 'mcp-linkr'), command: process.execPath, args: ['test/mcp-smoke.mjs'] },
