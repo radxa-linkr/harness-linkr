@@ -1174,8 +1174,10 @@ async function main() {
       assert.equal(written.username, 'xzl2');
       assert.equal(written.streamFps, 5);
       assert.ok(!('password' in written), 'a masked password is never written anywhere');
-      const bad = await httpJson(site, '/linkr/config', { method: 'POST', body: { baseUrl: 'nope' } });
-      assert.equal(bad.status, 400);
+      for (const badUrl of ['nope', 'http://127.0.0.1:1/linkr', 'http://127.0.0.1:1/?x=1', 'ftp://127.0.0.1:1']) {
+        const bad = await httpJson(site, '/linkr/config', { method: 'POST', body: { baseUrl: badUrl } });
+        assert.equal(bad.status, 400, `baseUrl ${badUrl} must be rejected`);
+      }
       const empty = await httpJson(site, '/linkr/config', { method: 'POST', body: { password: '\u2022\u2022\u2022\u2022\u2022\u2022' } });
       assert.equal(empty.status, 400, 'a masked password alone is not a change');
       return `applied=profile, configEditor edit carried baseUrl/username/streamFps, no password key`;

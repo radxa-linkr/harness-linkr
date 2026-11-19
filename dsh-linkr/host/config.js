@@ -89,11 +89,36 @@ export function normalizeConfig(raw, issues) {
 
   let baseUrl = text('baseUrl', CONFIG_DEFAULTS.baseUrl).trim().replace(/\/+$/, '');
   if (baseUrl === '') baseUrl = CONFIG_DEFAULTS.baseUrl;
-  if (!/^https?:\/\//i.test(baseUrl)) {
+  let parsedBase;
+  try {
+    parsedBase = new URL(baseUrl);
+  } catch {
+    parsedBase = null;
+  }
+  if (parsedBase === null) {
     issues?.push({
       message: `baseUrl must start with http:// or https:// (the device serves plain HTTP), got "${baseUrl}"`,
       path: [{ key: 'baseUrl' }],
     });
+  } else if (!['http:', 'https:'].includes(parsedBase.protocol)) {
+    issues?.push({
+      message: `baseUrl must use http:// or https:// (the device serves plain HTTP), got "${baseUrl}"`,
+      path: [{ key: 'baseUrl' }],
+    });
+  } else if (
+    parsedBase.username !== '' ||
+    parsedBase.password !== '' ||
+    parsedBase.search !== '' ||
+    parsedBase.hash !== '' ||
+    !['', '/'].includes(parsedBase.pathname)
+  ) {
+    issues?.push({
+      message: `baseUrl must be a host and optional port only, without credentials, path or query, got "${baseUrl}"`,
+      path: [{ key: 'baseUrl' }],
+    });
+  } else {
+    // Canonical origin: the device client appends /api paths to it.
+    baseUrl = parsedBase.origin;
   }
   const codec = text('codec', CONFIG_DEFAULTS.codec).trim().toLowerCase();
   if (!CODEC_VALUES.includes(codec)) {

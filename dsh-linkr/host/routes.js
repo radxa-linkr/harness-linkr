@@ -79,6 +79,7 @@ export function registerRoutes(ctx, deps) {
       let closed = false;
       let pending = null;
       let writing = false;
+      let blocked = false;
       let lastWriteAt = 0;
       let throttle = null;
       let unsubscribe = null;
@@ -120,12 +121,13 @@ export function registerRoutes(ctx, deps) {
       });
 
       const writeFrame = (frame) => {
-        if (closed || frame === null || frame === undefined) return false;
+        if (closed || blocked || frame === null || frame === undefined) return false;
         const jpeg = Buffer.isBuffer(frame.jpeg) ? frame.jpeg : Buffer.from(frame.jpeg ?? []);
         if (jpeg.length === 0) return false;
-        res.write(`--${BOUNDARY}\r\nContent-Type: image/jpeg\r\nContent-Length: ${jpeg.length}\r\n\r\n`);
-        res.write(jpeg);
-        res.write('\r\n');
+        const head = Buffer.from(`--${BOUNDARY}\r\nContent-Type: image/jpeg\r\nContent-Length: ${jpeg.length}\r\n\r\n`, 'utf8');
+        // One write per frame; a slow panel keeps only the newest one instead of
+        // queueing the stream in the response buffer.
+        if (!res.write(Buffer.concat([head, jpeg, Buffer.from('\r\n')]))) blocked = true;
         lastWriteAt = Date.now();
         return true;
       };
@@ -133,7 +135,7 @@ export function registerRoutes(ctx, deps) {
       // Never more than one part per frame slot: the device may push faster than
       // the panel asked for, and a slow socket must not queue frames forever.
       const pump = () => {
-        if (closed || writing || pending === null) return;
+        if (closed || blocked || writing || pending === null) return;
         const wait = lastWriteAt === 0 ? 0 : interval - (Date.now() - lastWriteAt);
         if (wait > 0) {
           if (throttle === null) {
@@ -208,6 +210,10 @@ export function registerRoutes(ctx, deps) {
       }, 1000);
       watchdog.unref?.();
 
+      res.on('drain', () => {
+        blocked = false;
+        if (pending !== null) pump();
+      });
       req.on('close', stop);
       req.on('error', stop);
       res.on('close', stop);
