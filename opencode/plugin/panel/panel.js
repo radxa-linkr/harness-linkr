@@ -29,6 +29,8 @@
   let fit = true;
   let busy = false;
   let streamed = false;
+  let changingConnection = false;
+  let stopped = false;
   let lastPoint = null;
   let dragStart = null;
   let dragged = false;
@@ -103,18 +105,20 @@
 
   function startStream() {
     clearTimeout(retry);
+    if (stopped || changingConnection) return;
     frame.hidden = false;
     hint.hidden = true;
     frame.src = withToken(`/stream?n=${Date.now()}-${(streamNonce += 1)}`);
   }
 
   frame.addEventListener('load', () => {
+    if (stopped || changingConnection || frame.hidden) return;
     streamed = true;
     hint.hidden = true;
     setStatus('on', '已连接 · 实时画面');
   });
   frame.addEventListener('error', () => {
-    if (frame.hidden) return;
+    if (stopped || changingConnection || frame.hidden) return;
     streamed = false;
     reportPanelError('stream failed');
     setStatus('err', '未连接或设备不可达');
@@ -222,7 +226,23 @@
     }
   }, { passive: false });
 
-  $('refresh').addEventListener('click', () => { hint.textContent = ''; startStream(); });
+  $('refresh').addEventListener('click', async () => {
+    if (changingConnection) return;
+    changingConnection = true;
+    clearTimeout(retry);
+    let connected = false;
+    try {
+      await api('/input.json', { action: 'connect' });
+      stopped = false;
+      connected = true;
+    } catch (error) {
+      showToast(error.message);
+    } finally {
+      changingConnection = false;
+      if (connected) startStream();
+      void refreshState();
+    }
+  });
   $('fit').addEventListener('click', () => {
     fit = !fit;
     stage.classList.toggle('fit', fit);
@@ -230,17 +250,37 @@
     $('fit').setAttribute('aria-pressed', String(fit));
   });
   $('capture').addEventListener('click', () => window.open(withToken('/frame.jpg'), '_blank', 'noopener'));
+  function showStopped(error = '') {
+    stopped = true;
+    clearTimeout(retry);
+    streamed = false;
+    frame.hidden = true;
+    if (frame.hasAttribute('src')) frame.removeAttribute('src');
+    metrics.textContent = '—';
+    hint.hidden = false;
+    hint.textContent = error || '已断开。点「刷新画面」重新连接。';
+    setStatus(error ? 'err' : '', error ? '设备模式未恢复' : '已断开');
+  }
+
   $('disconnect').addEventListener('click', async () => {
+    if (changingConnection) return;
+    changingConnection = true;
+    clearTimeout(retry);
+    // Hide and detach the image before ending the stream so it cannot retry.
+    streamed = false;
+    frame.hidden = true;
+    frame.removeAttribute('src');
     try {
       await api('/input.json', { action: 'disconnect' });
-      streamed = false;
-      frame.hidden = true;
-      frame.removeAttribute('src');
-      hint.hidden = false;
-      hint.textContent = '已断开。点「刷新画面」重新连接。';
-      setStatus('', '已断开');
+      showStopped();
     } catch (error) {
-      showToast(String(error.message || error));
+      hint.hidden = false;
+      hint.textContent = error.message;
+      setStatus('err', '断开失败');
+      showToast(error.message);
+    } finally {
+      changingConnection = false;
+      void refreshState();
     }
   });
 
@@ -286,7 +326,13 @@
   async function refreshState() {
     try {
       const payload = await api('/state.json');
+      if (changingConnection) return;
       const state = payload.state || {};
+      renderActivity(payload.activity);
+      if (state.stopped || state.stopError) {
+        showStopped(state.stopError);
+        return;
+      }
       if (typeof payload.error === 'string' && payload.error !== '') {
         setStatus('err', '连接失败');
         metrics.textContent = '—';
@@ -303,15 +349,13 @@
         setStatus('warn', '等待画面…');
         metrics.textContent = '—';
       }
-      renderActivity(payload.activity);
     } catch {
       /* the panel itself is up; the stream error path reports device trouble */
     }
   }
 
   stage.classList.add('fit');
-  startStream();
-  refreshState();
+  void refreshState().then(() => { if (!stopped) startStream(); });
   stateTimer = setInterval(refreshState, 2000);
   window.addEventListener('beforeunload', () => clearInterval(stateTimer));
 })();

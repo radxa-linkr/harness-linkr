@@ -3,8 +3,8 @@
  * Smoke check for the native plugin's web panel (`opencode/plugin/panel-server.js`).
  *
  * The server only depends on the Linkr tools interface (`callTool`, `onFrame`,
- * `panelState`, `stop`), so this drives it with a stub: no device, no
- * node_modules and no OpenCode needed. It exercises the token gate, the page
+ * `panelState`, `stop`). This drives it with stubs and a local fake device:
+ * no hardware or OpenCode needed. It exercises the token gate, the page
  * assets, the MJPEG stream, the JSON state/activity and the input endpoint.
  *
  *   node scripts/opencode-panel-smoke.mjs
@@ -215,6 +215,66 @@ await check('a viewer that leaves during connection is removed and the session r
     controller.abort();
     finish();
     await panel.close();
+  }
+});
+
+await check('manual refresh reconnects after Stop and failed restoration can be retried', async () => {
+  const { mkdtemp, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { createFakeDevice } = await import('../dsh-linkr/test/fake-device.mjs');
+  const { readConfig } = await import('../mcp-linkr/config.js');
+  const { createLinkrTools } = await import('../mcp-linkr/tools.js');
+  const scratch = await mkdtemp(join(tmpdir(), 'linkr-panel-reconnect-'));
+  const oldStateDir = process.env.LINKR_STATE_DIR;
+  process.env.LINKR_STATE_DIR = scratch;
+  const fake = createFakeDevice({ initialCodec: 0 });
+  let tools;
+  let panel;
+  try {
+    const origin = await fake.listen();
+    tools = createLinkrTools(readConfig({
+      LINKR_BASE_URL: origin, LINKR_USERNAME: fake.config.username,
+      LINKR_PASSWORD: fake.config.password, LINKR_CODEC: 'mjpeg', LINKR_SAVE_DIR: scratch,
+    }));
+    panel = await createPanelServer({ tools });
+    const get = path => fetch(new URL(`${path}?t=${panel.token}`, panel.url), { signal: AbortSignal.timeout(5000) });
+    const action = action => fetch(new URL(`/input.json?t=${panel.token}`, panel.url), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }), signal: AbortSignal.timeout(5000),
+    });
+    assert.equal((await action('connect')).status, 200);
+    assert.equal(fake.codec, 1);
+    assert.equal((await action('disconnect')).status, 200);
+    assert.equal(fake.codec, 0);
+    assert.equal((await (await get('/state.json')).json()).state.stopped, true);
+    assert.match(await (await get('/stream')).text(), /stopped by the user/);
+    assert.equal(fake.whepCalls, 1, 'a passive stream retry cannot override Stop');
+    assert.equal((await action('connect')).status, 200);
+    assert.equal(fake.codec, 1);
+    assert.equal(fake.whepCalls, 2, 'manual refresh starts a new media session');
+
+    fake.codecWriteFails = true;
+    const failed = await action('disconnect');
+    assert.equal(failed.status, 409);
+    assert.match((await failed.json()).error, /设备视频模式未恢复/);
+    const state = (await (await get('/state.json')).json()).state;
+    assert.equal(state.connected, false);
+    assert.equal(state.stopped, true);
+    assert.match(state.stopError, /重试「断开」/);
+    assert.equal(tools.panelState().state.modeOwned, true);
+    assert.equal((await action('connect')).status, 409, 'resolve mode debt before restarting');
+    fake.codecWriteFails = false;
+    assert.equal((await action('disconnect')).status, 200);
+    assert.equal(fake.codec, 0);
+    assert.equal((await (await get('/state.json')).json()).state.stopError, '');
+  } finally {
+    fake.codecWriteFails = false;
+    await panel?.close();
+    await tools?.dispose();
+    await fake.close();
+    if (oldStateDir === undefined) delete process.env.LINKR_STATE_DIR;
+    else process.env.LINKR_STATE_DIR = oldStateDir;
+    await rm(scratch, { recursive: true, force: true });
   }
 });
 

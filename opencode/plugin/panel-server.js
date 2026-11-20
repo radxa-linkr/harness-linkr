@@ -66,6 +66,8 @@ export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, f
   let lastFrame = null;
   let lastBroadcastAt = 0;
   let lastError = '';
+  let stopError = '';
+  let changingConnection = false;
   let closed = false;
   /** True when this panel is the component that opened the device session. */
   let panelStarted = false;
@@ -119,6 +121,7 @@ export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, f
   async function ensureSession() {
     // The first capture opens the device session; frames then arrive through
     // the session's listener and are fanned out to the browser.
+    if (changingConnection || stopError) throw new Error(stopError || '连接状态正在切换，请稍后重试。');
     const wasConnected = tools.panelState?.()?.state?.connected === true;
     const result = await tools.callTool('linkr_computer_use', { action: 'capture' }, {});
     if (result?.isError === true) {
@@ -202,7 +205,7 @@ export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, f
     let activity = [];
     try {
       const snapshot = tools.panelState?.() ?? {};
-      state = snapshot.state ?? {};
+      state = { ...snapshot.state, stopped: snapshot.stopped === true };
       activity = Array.isArray(snapshot.activity) ? snapshot.activity.slice(0, 8) : [];
     } catch {
       /* no session yet */
@@ -213,6 +216,8 @@ export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, f
       error: lastError,
       state: {
         connected: Boolean(state.connected),
+        stopped: Boolean(state.stopped),
+        stopError,
         codec: typeof state.codec === 'string' ? state.codec : '',
         width: size.width,
         height: size.height,
@@ -236,13 +241,41 @@ export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, f
   async function handleInput(request, response) {
     const body = await readBody(request);
     const action = typeof body?.action === 'string' ? body.action.trim().toLowerCase() : '';
-    if (action === 'disconnect') {
-      try {
-        await tools.stop?.();
-      } catch {
-        /* already stopped */
+    if (action === 'connect' || action === 'disconnect') {
+      if (changingConnection || (action === 'connect' && stopError)) {
+        sendJson(response, 409, { ok: false, error: stopError || '连接状态正在切换，请稍后重试。' });
+        return;
       }
-      sendJson(response, 200, { ok: true, disconnected: true });
+      changingConnection = true;
+      try {
+        if (action === 'connect') {
+          const wasConnected = tools.panelState?.()?.state?.connected === true;
+          const result = await tools.callTool('linkr_panel', { action: 'start' }, {});
+          if (result?.isError) throw new Error(result.value?.error || '无法启动设备会话。');
+          if (!wasConnected) panelStarted = true;
+          lastError = '';
+          scheduleDetach();
+          sendJson(response, 200, { ok: true });
+        } else {
+          panelStarted = false;
+          clearDetach();
+          for (const stream of subscribers) stream.end();
+          subscribers.clear();
+          blocked.clear();
+          unwatchFramesIfIdle();
+          lastFrame = null;
+          lastError = '';
+          await tools.stop();
+          stopError = '';
+          sendJson(response, 200, { ok: true, disconnected: true });
+        }
+      } catch (error) {
+        const detail = String(error?.message ?? error);
+        if (action === 'disconnect') stopError = `画面已停止，但设备视频模式未恢复。请重试「断开」。${detail}`;
+        sendJson(response, 409, { ok: false, error: stopError || detail });
+      } finally {
+        changingConnection = false;
+      }
       return;
     }
     if (!ACTIONS.has(action)) {
