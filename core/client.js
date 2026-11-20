@@ -154,6 +154,7 @@ export class LinkrClient {
   #priorMode = null;
   #modeOwned = false;
   #restoring = null;
+  #closing = null;
   #disposePromise = null;
   #error = '';
   #disposed = false;
@@ -237,7 +238,13 @@ export class LinkrClient {
   }
 
   /** Login (once) + ensure a live media session. Concurrent calls share one start. */
+  /** Wait for an unexpected close to finish restoring mode and releasing ownership. */
+  async waitForSessionCleanup() {
+    await this.#closing;
+  }
+
   async connect() {
+    if (this.#closing) await this.#closing;
     if (this.#disposed) {
       throw new LinkrError('client disposed', {
         sentence: 'this Linkr client was disposed; create a new one',
@@ -256,6 +263,7 @@ export class LinkrClient {
 
   /** Stop the session now and restore the device video mode. */
   async disconnect() {
+    if (this.#closing) await this.#closing;
     if (this.#starting) {
       // Let an in-flight start settle so we do not leak its socket/mode write.
       await this.#starting.catch(() => {});
@@ -530,6 +538,7 @@ export class LinkrClient {
       this.#disposed = true;
       this.#clearIdle();
       await this.#starting?.catch(() => {});
+      if (this.#closing) await this.#closing;
       await this.#teardown();
       if (this.#device) {
         try {
@@ -640,7 +649,7 @@ export class LinkrClient {
       this.#session = session;
       this.#activeCodec = codec;
       session.onFrame((frame) => this.#emitFrame(frame));
-      session.onClose((reason) => this.#onSessionClosed(reason));
+      session.onClose((reason) => this.#onSessionClosed(session, reason));
       session.onDecodeError((error) => this.#onSessionDecodeError(session, error));
       await session.start({ timeoutMs: 12000 });
       this.#touch();
@@ -778,7 +787,7 @@ export class LinkrClient {
     }
   }
 
-  async #teardown() {
+  async #teardown(reason = 'disconnect') {
     this.#clearIdle();
     this.#dropClipboard();
     const hadSession = this.#session !== null || this.#modeOwned;
@@ -799,23 +808,15 @@ export class LinkrClient {
     // take the device; a failed restore keeps the lease and the retry path.
     // Nothing to report when there was no session and no debt (a second dispose
     // or a disconnect after dispose must not look like another session end).
-    if (hadSession) await this.#notifySessionEnd('disconnect', this.#modeOwned === false);
+    if (hadSession) await this.#notifySessionEnd(reason, this.#modeOwned === false);
   }
 
-  #onSessionClosed(reason) {
-    if (this.#stoppingSession) return;
+  #onSessionClosed(session, reason) {
+    // Startup owns its own teardown (and can retry with MJPEG).
+    if (this.#stoppingSession || this.#session !== session) return;
     this.#error = reason;
-    this.#clearIdle();
-    const session = this.#session;
-    this.#session = null;
-    this.#activeCodec = null;
-    try {
-      session?.stop();
-    } catch {
-      // ignore
-    }
-    // The session is gone; the device still owes us the old video mode.
-    this.#restoreVideoMode().catch(() => {});
+    if (this.#starting) return;
+    this.#closing = this.#teardown(reason).finally(() => { this.#closing = null; });
   }
 
   #emitFrame(frame) {

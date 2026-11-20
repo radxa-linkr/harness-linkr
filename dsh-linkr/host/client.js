@@ -307,10 +307,10 @@ export function createClientManager(deps) {
    * `idleMs` is left alone. Disconnecting restores the mode and releases the
    * journal; the next capture starts a new session.
    */
-  async function releaseIfIdle({ idleMs = 10000 } = {}) {
+  async function releaseIfIdle({ idleMs = 10000, expected } = {}) {
     if (deps.explicitStop) return false;
     const instance = client;
-    if (!instance || instance.state.connected !== true) return false;
+    if (!instance || (expected && instance !== expected) || instance.state.connected !== true) return false;
     if (Date.now() - lastUseAt < Math.max(0, Number(idleMs) || 0)) return false;
     await instance.disconnect();
     return true;

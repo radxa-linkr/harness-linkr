@@ -48,6 +48,25 @@ test('SIGKILL after mode write but before first frame is recoverable', async t =
   assert.equal(code, 0); assert.equal(fake.codec, 0);
 });
 
+test('an unexpected media close restores the mode and releases the lease', async t => {
+  const { fake, start } = await fixture(t);
+  const first = await start();
+  assert.ok(!(await first.tool('linkr_computer_use', { action: 'capture' }).result).isError);
+  fake.dropMediaSockets();
+  await until(() => fake.codec === 0);
+  const second = await start();
+  // Journal cleanup and TCP lease release follow the mode restore asynchronously.
+  let capture;
+  const deadline = Date.now() + 3000;
+  do {
+    capture = await second.tool('linkr_computer_use', { action: 'capture' }).result;
+    if (!capture.isError) break;
+    await sleep(25);
+  } while (Date.now() < deadline);
+  assert.ok(!capture.isError, JSON.stringify(capture).slice(0, 300));
+  assert.equal(fake.codec, 1);
+});
+
 test('an idle-stopped session releases the device lease for another app', async t => {
   const { fake, start } = await fixture(t, { LINKR_IDLE_STOP_MS: '300' });
   const first = await start();

@@ -142,7 +142,7 @@ export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, f
    * free. A reconnect (new viewer) cancels the timer.
    */
   function scheduleDetach() {
-    if (!panelStarted || subscribers.size > 0 || typeof tools.releaseIfIdle !== 'function') return;
+    if (closed || !panelStarted || subscribers.size > 0 || typeof tools.releaseIfIdle !== 'function') return;
     clearDetach();
     detachTimer = setTimeout(() => {
       detachTimer = null;
@@ -170,25 +170,31 @@ export async function createPanelServer({ tools, host = '127.0.0.1', port = 0, f
     // A new viewer starts a new session: do not replay the last frame of a
     // previous one while the device connects.
     if (subscribers.size === 1) lastFrame = null;
-    try {
-      await ensureSession();
-    } catch (error) {
-      lastError = String(error?.message ?? error);
-      response.write(Buffer.from(`--${BOUNDARY}\r\nContent-Type: text/plain\r\n\r\n${lastError}\r\n`));
-      response.end();
-      subscribers.delete(response);
-      blocked.delete(response);
-      return;
-    }
-    watchFrames();
-    if (lastFrame !== null) broadcast(lastFrame);
-    response.on('drain', () => blocked.delete(response));
-    request.on('close', () => {
+    const detach = () => {
       subscribers.delete(response);
       blocked.delete(response);
       unwatchFramesIfIdle();
       scheduleDetach();
-    });
+    };
+    response.once('close', detach);
+    response.on('drain', () => blocked.delete(response));
+    try {
+      await ensureSession();
+    } catch (error) {
+      lastError = String(error?.message ?? error);
+      if (subscribers.has(response) && !response.destroyed) {
+        response.end(Buffer.from(`--${BOUNDARY}\r\nContent-Type: text/plain\r\n\r\n${lastError}\r\n`));
+      }
+      detach();
+      return;
+    }
+    if (!subscribers.has(response) || response.destroyed) {
+      // The session may only now have been marked as panel-started.
+      detach();
+      return;
+    }
+    watchFrames();
+    if (lastFrame !== null) broadcast(lastFrame);
   }
 
   function panelState() {

@@ -827,3 +827,9 @@ the session is connected and `lastUseAt` (updated by every `liveClient()` — ag
 tool or panel stream) is older than `idleMs`; the disconnect restores the mode
 through the normal path. A session started or recently used by the agent is left
 to the configured idle stop. `release-idle.test.mjs` covers the manager guards.
+
+Follow-up: a panel-started session is tracked across all viewers, including when
+`POST /linkr/connect` starts it before any image request. With no viewers, the
+route schedules the same grace period; opening a stream cancels it and the last
+stream to leave schedules it again. The timer cannot release a replacement
+client. The route regression exercises the connect request and two viewers.

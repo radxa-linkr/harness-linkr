@@ -181,5 +181,42 @@ await check('a failed session surfaces its sentence in /state.json', async () =>
   await failingServer.close();
 });
 
+await check('a viewer that leaves during connection is removed and the session released', async () => {
+  let finish;
+  const startup = new Promise(resolve => { finish = resolve; });
+  let released;
+  const release = new Promise(resolve => { released = resolve; });
+  let connected = false;
+  let listeners = 0;
+  const panel = await createPanelServer({ detachGraceMs: 20, tools: {
+    async callTool() { await startup; connected = true; return {}; },
+    panelState: () => ({ state: { connected } }),
+    onFrame() { listeners++; return () => { listeners--; }; },
+    async releaseIfIdle() { connected = false; released(); return true; },
+  } });
+  const status = () => fetch(new URL('/state.json?t=' + panel.token, panel.url)).then(res => res.json());
+  const signal = AbortSignal.timeout(3000);
+  const controller = new AbortController();
+  try {
+    await fetch(new URL('/stream?t=' + panel.token, panel.url), { signal: controller.signal });
+    controller.abort();
+    while ((await status()).state.subscribers !== 0) {
+      signal.throwIfAborted();
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    finish();
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('aborted startup session was not released')), 1000);
+      release.then(() => { clearTimeout(timer); resolve(); });
+    });
+    assert.equal(listeners, 0);
+    assert.equal((await status()).state.subscribers, 0);
+  } finally {
+    controller.abort();
+    finish();
+    await panel.close();
+  }
+});
+
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILED`);
 process.exit(failures === 0 ? 0 : 1);

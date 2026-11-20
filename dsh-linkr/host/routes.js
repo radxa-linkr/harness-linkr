@@ -38,12 +38,12 @@ async function readJsonBody(req) {
   return text ? JSON.parse(text) : {};
 }
 
-export function registerRoutes(ctx, deps) {
+export function registerRoutes(ctx, deps, { detachGraceMs = 8000 } = {}) {
   /** Every live screen stream the plugin handed out, so a dispose or a disconnect can end them. */
   const liveStreams = new Set();
-  /** Wait after the last viewer before ending a session the panel itself opened. */
-  const PANEL_DETACH_MS = 8000;
   let detachTimer = null;
+  let panelClient = null;
+  let openingStreams = 0;
 
   function clearDetachTimer() {
     if (detachTimer !== null) {
@@ -54,18 +54,32 @@ export function registerRoutes(ctx, deps) {
 
   /** The last viewer is gone: let an untouched, panel-started session go. */
   function schedulePanelDetach() {
-    if (detachTimer !== null || typeof deps.client.releaseIfIdle !== 'function') return;
+    if (!panelClient || openingStreams || liveStreams.size || detachTimer !== null) return;
+    const expected = panelClient;
     detachTimer = setTimeout(() => {
       detachTimer = null;
       Promise.resolve()
-        .then(() => deps.client.releaseIfIdle({ idleMs: PANEL_DETACH_MS }))
+        .then(() => {
+          if (expected !== panelClient || openingStreams || liveStreams.size) return;
+          return deps.client.releaseIfIdle({ idleMs: detachGraceMs, expected });
+        })
+        .then((released) => { if (released && panelClient === expected) panelClient = null; })
         .catch(() => {});
-    }, PANEL_DETACH_MS);
+    }, detachGraceMs);
     detachTimer.unref?.();
+  }
+
+  async function openPanelSession() {
+    const expected = await deps.client.currentClient();
+    const alreadyLive = expected.state.connected === true;
+    const current = await deps.client.liveClient();
+    if (!alreadyLive && !deps.explicitStop) panelClient = current;
+    return current;
   }
 
   function stopLiveStreams() {
     clearDetachTimer();
+    panelClient = null;
     for (const entry of [...liveStreams]) {
       try {
         entry.stop();
@@ -84,16 +98,14 @@ export function registerRoutes(ctx, deps) {
   function openLiveStream(req, res) {
     void (async () => {
       clearDetachTimer();
-      let panelStarted = false;
+      openingStreams += 1;
       let current;
       try {
-        try {
-          panelStarted = (await deps.client.stateJson()).connected !== true;
-        } catch {
-          panelStarted = false;
-        }
-        current = await deps.client.liveClient();
+        current = await openPanelSession();
       } catch (error) {
+        openingStreams -= 1;
+        schedulePanelDetach();
+        if (res.destroyed) return;
         // An <img> cannot read a body; the panel turns a failed load into a retry
         // and shows this line in its state text. A stream that cannot start is
         // also worth a row: it is how a dead device looks from the panel side.
@@ -102,6 +114,12 @@ export function registerRoutes(ctx, deps) {
         return;
       }
 
+      openingStreams -= 1;
+      if (res.destroyed || deps.explicitStop) {
+        schedulePanelDetach();
+        if (!res.destroyed) sendJson(res, 409, { ok: false, error: STOPPED_SENTENCE });
+        return;
+      }
       const fps = Math.max(STREAM_FPS_RANGE[0], Math.min(STREAM_FPS_RANGE[1], deps.config.streamFps || CONFIG_DEFAULTS.streamFps));
       const interval = Math.round(1000 / fps);
       const keepAliveMs = Math.max(5000, Math.floor((deps.config.idleStopMs || CONFIG_DEFAULTS.idleStopMs) / 2));
@@ -133,7 +151,7 @@ export function registerRoutes(ctx, deps) {
           unsubscribe = null;
         }
         if (entry !== null) liveStreams.delete(entry);
-        if (liveStreams.size === 0 && panelStarted) schedulePanelDetach();
+        schedulePanelDetach();
         try {
           res.end();
         } catch {
@@ -142,6 +160,8 @@ export function registerRoutes(ctx, deps) {
       };
       entry = { stop };
       liveStreams.add(entry);
+      res.once('close', stop);
+      res.once('error', stop);
 
       res.writeHead(200, {
         'Content-Type': `multipart/x-mixed-replace; boundary=${BOUNDARY}`,
@@ -217,6 +237,7 @@ export function registerRoutes(ctx, deps) {
       // A panel that keeps watching is activity the session must not idle out
       // from under it, and a session that stopped must close the response rather
       // than leave the <img> hanging on a stream nobody feeds.
+      if (closed) return;
       watchdog = setInterval(() => {
         if (closed) return;
         let live = false;
@@ -231,9 +252,7 @@ export function registerRoutes(ctx, deps) {
         }
         if (Date.now() - keepAliveAt >= keepAliveMs) {
           keepAliveAt = Date.now();
-          Promise.resolve()
-            .then(() => current.connect())
-            .catch(() => {});
+          current.keepAlive?.();
         }
         // While a panel watches, this tick is the fastest witness of a session
         // that stopped on its own (idle stop, dropped socket).
@@ -245,10 +264,6 @@ export function registerRoutes(ctx, deps) {
         blocked = false;
         if (pending !== null) pump();
       });
-      req.on('close', stop);
-      req.on('error', stop);
-      res.on('close', stop);
-      res.on('error', stop);
     })();
   }
 
@@ -395,8 +410,10 @@ export function registerRoutes(ctx, deps) {
         }
         if (req.method === 'POST' && path === '/connect') {
           deps.explicitStop = false;
+          clearDetachTimer();
           try {
-            const current = await deps.client.liveClient();
+            const current = await openPanelSession();
+            schedulePanelDetach();
             // A person connecting is their own act: it changes the session,
             // not the agent's record (CONTRACT §13.1). Only the memory moves.
             deps.client.noteSession('connect');

@@ -331,10 +331,13 @@ export function createLinkrTools(config, { log = () => {} } = {}) {
     check(signal);
     if (stopped && !explicit) throw new Error('Linkr is stopped by the user; press Start in the panel before using it again');
     if (explicit) stopped = false;
+    const instance = current();
+    await instance.waitForSessionCleanup();
+    check(signal);
     await ensureLease();
     check(signal);
     try {
-      await current().connect();
+      await instance.connect();
       check(signal);
       authenticated = true;
     } catch (error) {
