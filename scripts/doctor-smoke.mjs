@@ -9,7 +9,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -74,22 +74,27 @@ function entryOf(report, name) {
 }
 
 async function main() {
-  await check('empty profile: warnings only, exit 0', async () => {
+  const missing = new Set();
+  for (const [name, cli] of Object.entries({ codex: 'codex', opencode: 'opencode', mimocode: 'mimo' })) {
+    if (spawnSync('/bin/sh', ['-c', 'command -v "$1"', 'sh', cli]).status !== 0) missing.add(name);
+  }
+
+  await check('empty profile: warn for unconfigured clients and skip missing clients', async () => {
     const result = await runDoctor(['--no-device', '--json']);
     assert.equal(result.code, 0, result.stderr);
     const parsed = parseJson(result);
     assert.equal(parsed.ok, true);
-    assert.ok(parsed.counts.WARN >= 4, `expected warnings, got ${JSON.stringify(parsed.counts)}`);
     for (const name of ['codex', 'opencode', 'mimocode', 'minimaxcode']) {
       const entry = entryOf(parsed, name);
       assert.ok(entry, `no ${name} entry`);
-      assert.equal(entry.level, 'WARN', `${name} should warn when unconfigured, got ${entry.level}`);
-      assert.ok(entry.fix, `${name} warning carries no fix`);
+      const expected = missing.has(name) ? 'SKIP' : 'WARN';
+      assert.equal(entry.level, expected, `${name}: ${entry.detail}`);
+      if (expected === 'WARN') assert.ok(entry.fix, `${name} warning carries no fix`);
     }
     assert.equal(entryOf(parsed, 'restore journal').level, 'PASS');
   });
 
-  await check('configured profile: harnesses pass', async () => {
+  await check('configured profile: distinguish installed clients from config files alone', async () => {
     const password = join(scratch, 'device-password');
     writeFileSync(password, 'smoke-password\n', { mode: 0o600 });
     const setup = await new Promise((resolve) => {
@@ -113,16 +118,37 @@ async function main() {
     const parsed = parseJson(result);
     for (const name of ['codex', 'opencode', 'mimocode', 'minimaxcode']) {
       const entry = entryOf(parsed, name);
-      // A running desktop build of OpenCode owns the CLI's managed socket, so the
-      // doctor cannot list its MCP servers; the project config setup.mjs wrote is
-      // still correct, which the setup smoke asserts directly.
-      if (name === 'opencode' && entry?.level === 'WARN' && /no linkr MCP entry/i.test(entry?.detail ?? '')) {
-        console.log('      (skipped: OpenCode desktop service owns the CLI socket)');
-        continue;
+      if (missing.has(name) && name !== 'codex') {
+        assert.equal(entry?.level, 'WARN', `${name}: expected a config-only warning`);
+        assert.match(entry.detail, /not on PATH/i);
+      } else {
+        const expected = missing.has(name) ? 'SKIP' : 'PASS';
+        assert.equal(entry?.level, expected, `${name}: ${entry?.detail}`);
       }
-      assert.equal(entry?.level, 'PASS', `${name}: expected PASS, got ${entry?.level} (${entry?.detail})`);
     }
     assert.equal(entryOf(parsed, 'device password file').level, 'PASS');
+  });
+
+  await check('OpenCode is optional with and without a project config', async () => {
+    const cwd = mkdtempSync(join(scratch, 'opencode-project-'));
+    const bin = mkdtempSync(join(scratch, 'bin-'));
+    const options = { cwd, env: { PATH: bin } };
+    async function expectOpenCode(level) {
+      const result = await runDoctor(['--no-device', '--json'], options);
+      assert.equal(result.code, 0, result.stderr);
+      const entry = entryOf(parseJson(result), 'opencode');
+      assert.equal(entry?.level, level, entry?.detail);
+    }
+
+    await expectOpenCode('SKIP');
+    const config = join(cwd, 'opencode.json');
+    writeFileSync(config, JSON.stringify({ mcp: { servers: { linkr: { type: 'local' } } } }));
+    await expectOpenCode('WARN');
+    // doctor only asks the installed OpenCode binary for its version.
+    writeFileSync(join(bin, 'opencode'), '#!/bin/sh\n[ "$1" = --version ] && echo 2.2.7\n', { mode: 0o755 });
+    await expectOpenCode('PASS');
+    rmSync(config);
+    await expectOpenCode('WARN');
   });
 
   await check('a stale restore journal is reported with its fix', async () => {
